@@ -66,6 +66,8 @@ export const COPY = {
   leave: 'Leave room',
   connecting: 'Connecting...',
   rotate: 'Turn your phone upright to play.',
+  crashed: 'Something went wrong on this screen.',
+  reload: 'Reload',
 } as const;
 
 export const describeRequirement = (r: GroupRequirement): string => {

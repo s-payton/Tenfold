@@ -47,13 +47,15 @@ export const App = () => {
     setScreen({ kind: 'lobby', room });
   };
 
-  const onStarted = useCallback((snapshot: RoomSnapshot) => {
-    setScreen((current) => {
-      if (current.kind !== 'lobby') return current;
-      const client = createRemoteGame(current.room.roomId, current.room.playerId, snapshot);
-      return client ? { kind: 'game', client, online: true } : current;
-    });
-  }, []);
+  const lobbyRoom = screen.kind === 'lobby' ? screen.room : null;
+  const onStarted = useCallback(
+    (snapshot: RoomSnapshot) => {
+      if (!lobbyRoom) return;
+      const client = createRemoteGame(lobbyRoom.roomId, lobbyRoom.playerId, snapshot);
+      if (client) setScreen({ kind: 'game', client, online: true });
+    },
+    [lobbyRoom],
+  );
 
   const goHome = () => {
     if (screen.kind === 'game') screen.client.dispose();

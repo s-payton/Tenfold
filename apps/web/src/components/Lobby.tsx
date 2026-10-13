@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MAX_PLAYERS, MIN_PLAYERS } from '@tenfold/engine';
 import { COPY, apiErrorMessage } from '../copy.ts';
 import { callGame } from '../net/api.ts';
@@ -19,11 +19,16 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const handedOff = useRef(false);
 
   useEffect(() => {
     const watch = watchRoom(roomId, (next) => {
-      if (next.data.table) onStarted(next);
-      else setSnapshot(next);
+      if (!next.data.table) {
+        setSnapshot(next);
+      } else if (!handedOff.current) {
+        handedOff.current = true;
+        onStarted(next);
+      }
     });
     return watch.stop;
   }, [roomId, onStarted]);

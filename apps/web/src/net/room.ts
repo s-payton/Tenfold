@@ -12,6 +12,10 @@ export interface RoomSnapshot {
 
 const MAX_READ_ATTEMPTS = 6;
 const RETRY_MS = 150;
+/** Safety net for dropped Realtime connections, for example after a phone sleeps. */
+const POLL_MS = 10_000;
+
+let watchCount = 0;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -40,7 +44,10 @@ export interface RoomWatch {
   readonly stop: () => void;
 }
 
-/** Calls `onSnapshot` with the room now and after every change, via Supabase Realtime. */
+/**
+ * Calls `onSnapshot` with the room now and after every change. Realtime pushes changes;
+ * a slow poll and a re-read when the page becomes visible cover dropped connections.
+ */
 export const watchRoom = (roomId: string, onSnapshot: (snapshot: RoomSnapshot) => void): RoomWatch => {
   let stopped = false;
   let latest = 0;
@@ -51,8 +58,10 @@ export const watchRoom = (roomId: string, onSnapshot: (snapshot: RoomSnapshot) =
       onSnapshot(snapshot);
     });
   };
+  // Supabase reuses a channel with the same topic, so every watch gets its own.
+  watchCount += 1;
   const channel = supabase
-    .channel(`room:${roomId}`)
+    .channel(`room:${roomId}:${String(watchCount)}`)
     .on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'room_states', filter: `room_id=eq.${roomId}` },
@@ -61,11 +70,18 @@ export const watchRoom = (roomId: string, onSnapshot: (snapshot: RoomSnapshot) =
     .subscribe((status) => {
       if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) refresh();
     });
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') refresh();
+  };
+  document.addEventListener('visibilitychange', onVisible);
+  const poll = setInterval(refresh, POLL_MS);
   refresh();
   return {
     refresh,
     stop: () => {
       stopped = true;
+      clearInterval(poll);
+      document.removeEventListener('visibilitychange', onVisible);
       void supabase.removeChannel(channel);
     },
   };
