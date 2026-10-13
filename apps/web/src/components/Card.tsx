@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import type { Card as CardData } from '@tenfold/engine';
 
 export type CardSize = 'sm' | 'md' | 'lg';
@@ -60,15 +60,15 @@ export const Card = ({ card, size = 'md', selected, highlight, onClick, enterDel
   } as const;
   if (!onClick) {
     return (
-      <motion.div {...motionProps}>
+      <m.div {...motionProps}>
         <Face card={card} />
-      </motion.div>
+      </m.div>
     );
   }
   return (
-    <motion.button type="button" aria-pressed={Boolean(selected)} onClick={onClick} {...motionProps}>
+    <m.button type="button" aria-pressed={Boolean(selected)} onClick={onClick} {...motionProps}>
       <Face card={card} />
-    </motion.button>
+    </m.button>
   );
 };
 

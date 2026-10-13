@@ -79,7 +79,7 @@ export const GameScreen = ({ client, onExit }: Props) => {
   const [pending, setPending] = useState<Pending | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [muted, setMutedState] = useState(false);
-  const [drawing, setDrawing] = useState(false);
+  const [drawing, setDrawing] = useState<'deck' | 'discard' | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [handStart, setHandStart] = useState({ hand: view.handNumber, levels: levelsOf(view) });
   const [seenTurn, setSeenTurn] = useState(view.turn);
@@ -168,9 +168,12 @@ export const GameScreen = ({ client, onExit }: Props) => {
   /** A draw needs the server (the card is secret), so block a second tap until it lands. */
   const draw = (source: 'deck' | 'discard') => {
     if (drawing) return;
-    setDrawing(true);
-    void send({ type: 'draw', source }).finally(() => setDrawing(false));
+    setDrawing(source);
+    void send({ type: 'draw', source }).finally(() => setDrawing(null));
   };
+  // Show the draw at once: the known discard, or a face-down card from the deck.
+  const stillDrawing = drawing !== null && view.step === 'draw';
+  const incoming = !stillDrawing ? null : drawing === 'discard' ? view.discardTop : 'face-down';
 
   const nextOpenBox = (build: Building, from: number): number => {
     const slots = slotsFor(build);
@@ -323,7 +326,8 @@ export const GameScreen = ({ client, onExit }: Props) => {
       <Piles
         view={view}
         canDraw={canDraw && !drawing}
-        pending={drawing}
+        pending={stillDrawing}
+        takingTop={stillDrawing && drawing === 'discard'}
         onDrawDeck={() => draw('deck')}
         onDrawDiscard={() => draw('discard')}
       />
@@ -386,6 +390,7 @@ export const GameScreen = ({ client, onExit }: Props) => {
           selected={new Set(selected ? [selected.id] : [])}
           onToggle={tapHandCard}
           dealing={!activeBuild && view.hand.length <= config.handSize}
+          incoming={incoming}
         />
       </section>
 

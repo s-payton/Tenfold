@@ -105,3 +105,11 @@ Measured before: about 500 to 600 ms per move at the function, plus a follow-up 
 - **`HouseRules`** (engine) is the host's menu: hitting on others, Skips, Wild discards, who leads, game length (`all`, `first-5`, `first-7`, `even`, the last three from the rule sheet's variations, renumbered from 1), and "everyone moves up each hand" (the other rule sheet variation: all advance after every hand, lowest total score after the last level wins, ties go to the earlier seat). `rulesFromHouse` turns it into a `RulesConfig`.
 - **Room settings** (`RoomData.settings`): house rules, table theme, and time per move (30, 60, 90 seconds or no timer; computer seats keep their short clock either way). Host-only, lobby-only, validated by `parseSettings`, and every server action uses the room's own rules. A new room starts with the host's remembered settings.
 - **Tables** are five themes (green, blue and red felt, wood, midnight) as CSS variable sets behind `data-table` on the page root. Everyone in a room sees the host's choice; games against the computer use this device's choice.
+
+## 2026-10-14: Speed pass
+
+- **Tried a direct Postgres connection from the function** (`postgres` driver through `SUPABASE_DB_URL`). Saving dropped from about 70 ms to about 8 ms, but loading rose to about 130 ms, because Supabase rarely reuses a function instance between requests, so nearly every request opened a new database connection. Net: no gain. Dropped; the function stays on the REST API. (The experiment's `play` function is still deployed on Supabase but unused; delete it with `supabase functions delete play` when convenient.)
+- **Signing keys bundled at deploy:** `sync-functions.mjs` saves the project's public JWKS into `_shared/jwks.json`, and the function verifies session tokens locally with `jose`. A cold start no longer downloads the keys (they cost 55 to 110 ms on most calls). If the keys rotate, it falls back to Supabase's own check.
+- **Draws feel instant:** a face-down card flies into the hand on tap (or the known discard, when taking it), replaced by the real card when the server answers.
+- **Smaller first download:** framer-motion runs through `LazyMotion` with `m` components, and its features load right after first paint. Main bundle 138 kB to 112 kB gzipped.
+- **Prefetch:** opening "Play with friends" starts loading the online code.

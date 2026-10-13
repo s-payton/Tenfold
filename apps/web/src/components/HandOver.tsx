@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import type { PublicView } from '@tenfold/engine';
 import { COPY } from '../copy.ts';
 
@@ -16,7 +16,7 @@ export const HandOver = ({ view, startLevels, names, onNext, onHome }: Props) =>
   const gameOver = view.status === 'game-over';
   return (
     <div className="overlay" role="dialog" aria-modal="true">
-      <motion.div
+      <m.div
         className="sheet"
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -47,7 +47,7 @@ export const HandOver = ({ view, startLevels, names, onNext, onHome }: Props) =>
             {COPY.nextHand}
           </button>
         )}
-      </motion.div>
+      </m.div>
     </div>
   );
 };

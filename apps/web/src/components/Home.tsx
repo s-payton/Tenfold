@@ -70,7 +70,11 @@ export const Home = (props: Props) => {
             role="tab"
             aria-selected={mode === m}
             className={`modes__tab ${mode === m ? 'modes__tab--on' : ''}`}
-            onClick={() => setMode(m)}
+            onClick={() => {
+              setMode(m);
+              // Warm up the online code while the player types their name.
+              if (m === 'friends') void import('../net/online.ts');
+            }}
           >
             {m === 'computer' ? COPY.modeComputer : COPY.modeFriends}
           </button>

@@ -8,12 +8,14 @@ interface Props {
   readonly canDraw: boolean;
   /** A draw is on its way from the server. */
   readonly pending: boolean;
+  /** The top discard is being taken: show the pile as waiting for what is underneath. */
+  readonly takingTop: boolean;
   readonly onDrawDeck: () => void;
   readonly onDrawDiscard: () => void;
 }
 
-export const Piles = ({ view, canDraw, pending, onDrawDeck, onDrawDiscard }: Props) => {
-  const top = view.discardTop;
+export const Piles = ({ view, canDraw, pending, takingTop, onDrawDeck, onDrawDiscard }: Props) => {
+  const top = takingTop ? null : view.discardTop;
   // A Skip on top stays tappable so the engine's refusal can explain why.
   const canTakeDiscard = canDraw && top !== null && top.kind !== 'skip';
   return (

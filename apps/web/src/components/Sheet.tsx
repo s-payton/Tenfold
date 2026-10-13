@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { COPY } from '../copy.ts';
 
 export interface SheetOption {
@@ -18,7 +18,7 @@ interface Props {
 /** A bottom sheet with a short list of choices. */
 export const Sheet = ({ title, options, onClose, note, cancelLabel }: Props) => (
   <div className="overlay" role="dialog" aria-modal="true" aria-label={title}>
-    <motion.div
+    <m.div
       className="sheet"
       initial={{ y: 200, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
@@ -34,6 +34,6 @@ export const Sheet = ({ title, options, onClose, note, cancelLabel }: Props) => 
       <button type="button" className="btn btn--ghost" onClick={onClose}>
         {cancelLabel ?? COPY.cancel}
       </button>
-    </motion.div>
+    </m.div>
   </div>
 );
