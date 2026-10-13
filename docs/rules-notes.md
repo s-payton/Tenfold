@@ -14,7 +14,7 @@ Status key: **Done** = implemented and tested. **Later** = decided, not built ye
 - A run longer than required counts ("lays down a run of 9 cards. This qualifies as 1 run of 7"). **Done**
 - Skips can never be taken from the discard pile. **Later**
 - A drawn Skip may be held or discarded later. **Later**
-- Hitting needs your own level laid down first, only on your turn, on your own groups or others'. Hitting is allowed in the same turn you lay down (sheet example). **Later**
+- Hitting needs your own level laid down first, only on your turn, on your own groups or others'. Hitting is allowed in the same turn you lay down (sheet example). **Done** for card fit, **Later** for turn checks
 - Going out means getting rid of every card "by discarding or hitting", so hitting your last card goes out with no discard. **Later**
 - A player who completes their level advances even if someone else goes out first. **Later**
 
@@ -22,7 +22,7 @@ Status key: **Done** = implemented and tested. **Later** = decided, not built ye
 
 1. **One natural card per group or per level?** The sheet says players can use any number of Wilds "as long as they use one (1) natural card", in the paragraph about completing a level. It does not say per group. CLAUDE.md says per group, and the second source says "Wild, Wild, Wild cannot form a valid [level] by itself". Engine: per group, behind `RulesConfig.requireNaturalCard` (default `true`). **Done**
 2. **Extra cards when laying down.** "You may lay down more than the minimum requirements ... but only if the additional cards can be directly added", and extra groups are not allowed ("requires exactly 2 sets"). Engine: group sizes are minimums, group count is exact. This matches laying down the minimum and hitting right away. **Done**
-3. **Wild value in a run is fixed.** "It cannot be replaced by the intended card ... but must remain as that card until the hand is over." Engine: runs are validated in position order and store `start` and `end`, so each Wild has a fixed value for hitting later. **Done**
+3. **Wild value in a run is fixed.** "It cannot be replaced by the intended card ... but must remain as that card until the hand is over." Engine: runs are validated in position order and store `start` and `end`, so each Wild has a fixed value. A natural cannot be hit onto a run in place of a Wild. **Done**
 4. **Wild placement is ambiguous** for groups like 3, 4, 5, Wild (2 to 5 or 3 to 6). The sheet does not say who picks. Engine: the player chooses by ordering the cards. `arrangeRun` lists every legal ordering so the UI can offer a choice or auto-pick. **Done**
 5. **Run bounds.** The sheet never says runs cannot wrap, but numbers only go 1 to 12. Engine: no wrap, and a Wild cannot stand for 0 or 13. **Done**
 6. **Color of a Wild in the color level.** A Wild takes the group's color. Physical Wilds are colored on the printed deck but the sheet says a Wild "may be used as any color", so our Wilds have no color. **Done**

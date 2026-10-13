@@ -15,3 +15,10 @@ Short log of architecture choices. Newest at the bottom.
 - **Validation returns typed results** (`{ ok: true, group }` or `{ ok: false, error }`) with string error codes, not exceptions, so the server can send a reason back to the client.
 - **RulesConfig from day one** with standard defaults, including the level list, so house rules are a data change.
 - **fast-check** (dev only) for property tests. The engine has zero runtime dependencies.
+
+## 2026-10-13: Hitting, scoring, CI
+
+- **`hit(group, card, config, position?)`** adds one card and returns a new group. It checks only whether the card fits. Who may hit (own level down, own turn, `allowHitOnOthers`) belongs to the turn logic.
+- **Wilds on runs need a chosen end** when both ends are open (`needs-position`). A natural card's end is implied by its value.
+- **Scoring constants** live in `scoring.ts`. They are not in `RulesConfig` because no planned house rule changes them.
+- **CI** runs typecheck, lint and tests on every push and pull request (Node 24). Deploy jobs come later.
