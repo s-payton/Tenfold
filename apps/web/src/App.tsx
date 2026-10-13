@@ -14,7 +14,7 @@ import { loadName, loadSavedRoom, saveName, saveRoom, type SavedRoom } from './n
 type Screen =
   | { readonly kind: 'home' }
   | { readonly kind: 'lobby'; readonly room: SavedRoom }
-  | { readonly kind: 'game'; readonly client: GameClient; readonly online: boolean };
+  | { readonly kind: 'game'; readonly client: GameClient };
 
 // Online play (Supabase) loads on first use, so the computer game stays small and offline-ready.
 const online = () => import('./net/online.ts');
@@ -69,7 +69,7 @@ export const App = () => {
       if (!lobbyRoom) return;
       void online().then(({ createRemoteGame }) => {
         const client = createRemoteGame(lobbyRoom.roomId, lobbyRoom.playerId, snapshot);
-        if (client) setScreen({ kind: 'game', client, online: true });
+        if (client) setScreen({ kind: 'game', client });
       });
     },
     [lobbyRoom],
@@ -95,7 +95,7 @@ export const App = () => {
             const config = rulesFromHouse(settings.rules);
             applyTable(settings.table);
             const client = createLocalGame({ opponents, level, config, ...(seed === undefined ? {} : { seed }) });
-            setScreen({ kind: 'game', client, online: false });
+            setScreen({ kind: 'game', client });
           }}
           onCreate={(name) => void enterRoom(online().then((m) => m.callGame({ type: 'create', name })), name)}
           onJoin={(name, code) =>
@@ -105,17 +105,17 @@ export const App = () => {
       )}
       {screen.kind === 'lobby' && (
         <Suspense fallback={<main className="lobby">{COPY.connecting}</main>}>
-        <Lobby
-          roomId={screen.room.roomId}
-          playerId={screen.room.playerId}
-          onStarted={onStarted}
-          onLeave={() => {
-            const roomId = screen.room.roomId;
-            void online().then((m) => m.callGame({ type: 'leave', roomId }));
-            saveRoom(null);
-            goHome();
-          }}
-        />
+          <Lobby
+            roomId={screen.room.roomId}
+            playerId={screen.room.playerId}
+            onStarted={onStarted}
+            onLeave={() => {
+              const roomId = screen.room.roomId;
+              void online().then((m) => m.callGame({ type: 'leave', roomId }));
+              saveRoom(null);
+              goHome();
+            }}
+          />
         </Suspense>
       )}
       {screen.kind === 'game' && <GameScreen client={screen.client} onExit={goHome} />}

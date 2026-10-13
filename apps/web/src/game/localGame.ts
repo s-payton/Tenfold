@@ -17,7 +17,7 @@ import type { GameClient } from './client.ts';
 export const HUMAN_ID = 'you';
 const OPPONENT_NAMES = ['Ada', 'Bo', 'Cy', 'Dee', 'Eli'];
 
-export interface LocalGameOptions {
+interface LocalGameOptions {
   readonly opponents: number;
   readonly level?: BotLevel;
   readonly seed?: number;

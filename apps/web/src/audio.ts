@@ -1,7 +1,7 @@
 import { Howl, Howler } from 'howler';
 
 /** All sounds are synthesized here, so there are no audio files to license. */
-export type SoundName =
+type SoundName =
   | 'select'
   | 'deal'
   | 'draw'

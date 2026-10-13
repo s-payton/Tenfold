@@ -35,8 +35,12 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
+// Room ids are uuid columns, so anything else is simply not a room (rather than a SQL error).
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const store: Store = {
   loadRoom: async (key) => {
+    if ('id' in key && !UUID.test(key.id)) return null;
     // One round trip: the room plus its seats, embedded through the foreign key.
     const query = admin.from('rooms').select('id, code, version, data, game, room_players(player_id, user_id)');
     const { data: room, error } = await ('id' in key ? query.eq('id', key.id) : query.eq('code', key.code)).maybeSingle();

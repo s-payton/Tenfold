@@ -119,3 +119,8 @@ Measured before: about 500 to 600 ms per move at the function, plus a follow-up 
 - **Why:** after the app became installable, phones kept running their saved copy until fully closed. In a playtest, the host had the newest build while other players still ran one without auto lay-down or the skip animation, which looked like bugs that only hit guests. A live two-phone test on the current build showed both features working for host and guest.
 - **Now:** the service worker uses `registerType: 'prompt'`. The app checks for a new version on open, when it returns to the foreground, and every 15 minutes. On the home screen it reloads straight away; anywhere else it shows an "Update" bar so a game is never interrupted. The home screen shows the build date and commit so players can compare versions.
 - **Turn glow:** the player's own area pulses gold on their turn (a steady glow with reduced motion).
+
+## 2026-10-13: Security pass
+
+- **Table grants tightened.** Supabase gives `anon` and `authenticated` full table privileges by default and relies on row-level security. A migration now revokes everything except `select` on `room_states` and `hands` for `authenticated`, so a missing policy can never become a hole (and `truncate`, which RLS does not cover, is gone).
+- **Malformed room ids are "not found"**, not a database error, in the Edge Function adapter.

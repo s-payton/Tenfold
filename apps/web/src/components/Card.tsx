@@ -1,7 +1,7 @@
 import { m } from 'framer-motion';
 import type { Card as CardData } from '@tenfold/engine';
 
-export type CardSize = 'sm' | 'md' | 'lg';
+type CardSize = 'sm' | 'md' | 'lg';
 
 interface CardProps {
   readonly card: CardData;
@@ -12,7 +12,7 @@ interface CardProps {
   readonly enterDelay?: number;
 }
 
-export const cardLabel = (card: CardData): string =>
+const cardLabel = (card: CardData): string =>
   card.kind === 'number' ? `${card.color} ${String(card.value)}` : card.kind;
 
 const Face = ({ card }: { readonly card: CardData }) => {

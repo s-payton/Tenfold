@@ -11,7 +11,7 @@ const isStandalone = () =>
 
 const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
 
-export type InstallOption =
+type InstallOption =
   | { readonly kind: 'none' }
   | { readonly kind: 'prompt'; readonly install: () => void }
   | { readonly kind: 'ios-hint' };

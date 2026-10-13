@@ -2,12 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './schema.ts';
 
 // Both values are public by design. Row-level security is what protects the data.
-export const SUPABASE_URL = 'https://miyplubvsjgqhbkpixqy.supabase.co';
-export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_BcP3XR7v6KeaZZwF4iRfqQ_AUDQsMFx';
+const SUPABASE_URL = 'https://miyplubvsjgqhbkpixqy.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_BcP3XR7v6KeaZZwF4iRfqQ_AUDQsMFx';
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-export type SessionResult = 'ok' | 'rate-limited' | 'failed';
+type SessionResult = 'ok' | 'rate-limited' | 'failed';
 
 /**
  * Makes sure this device has an anonymous session. The session lives in localStorage, so a

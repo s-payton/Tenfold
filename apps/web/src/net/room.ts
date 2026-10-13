@@ -17,7 +17,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * Reads the public room state and this player's hand (row-level security returns only
  * theirs). Retries until both come from the same save, so the table and hand always match.
  */
-export const readRoom = async (roomId: string): Promise<RoomSnapshot | null> => {
+const readRoom = async (roomId: string): Promise<RoomSnapshot | null> => {
   for (let attempt = 0; attempt < MAX_READ_ATTEMPTS; attempt++) {
     const [state, hand] = await Promise.all([
       supabase.from('room_states').select('version, data').eq('room_id', roomId).maybeSingle(),
@@ -32,7 +32,7 @@ export const readRoom = async (roomId: string): Promise<RoomSnapshot | null> => 
   return null;
 };
 
-export interface RoomWatch {
+interface RoomWatch {
   /** Re-reads now. */
   readonly refresh: () => void;
   /** Applies a snapshot the server sent back with a reply. It wins over anything at its version. */
