@@ -43,4 +43,4 @@ Short log of architecture choices. Newest at the bottom.
 - **Sounds are synthesized** at runtime into WAV data URIs played through Howler, so there are no audio files to license. Audio unlocks on the "Deal me in" tap for iOS.
 - **All UI wording lives in `apps/web/src/copy.ts`**, which says "level" everywhere.
 - **`?seed=<n>`** in the URL replays the same local deal, for testing and bug reports.
-- **Deploy:** pushes to `main` build `apps/web` and publish it to GitHub Pages under `/tenfold/`. The PWA manifest and icons come in build step 6.
+- **Deploy:** pushes to `main` build `apps/web` and publish it to GitHub Pages under `/Tenfold/` (case-sensitive, matches the repo name). The PWA manifest and icons come in build step 6.

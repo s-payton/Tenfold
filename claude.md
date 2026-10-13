@@ -24,7 +24,7 @@ A multiplayer card game for family and friends. Each player uses their own phone
   - On every push and pull request: `npm ci`, typecheck, lint, test. A failure blocks deploy.
   - On push to main: build `apps/web` and deploy to GitHub Pages (`upload-pages-artifact` and `deploy-pages`).
   - Also on main, once Supabase exists: use the Supabase CLI to push migrations and deploy Edge Functions so server and client run the same engine version.
-- Vite `base` must match the repo name (for example `/tenfold/`) or assets and the PWA manifest break. The manifest `start_url` and `scope` must use the same base.
+- Vite `base` must match the repo name exactly, including case (`/Tenfold/`) or assets and the PWA manifest break. The manifest `start_url` and `scope` must use the same base.
 - Pages needs Settings, Pages, Source set to "GitHub Actions" (a one-time manual step for the owner).
 - Portrait only. Android uses the manifest orientation. iOS shows a "rotate your phone" overlay in landscape.
 - iOS audio needs a user gesture, so unlock audio on the Join/Create button tap.
