@@ -50,6 +50,7 @@ describe('DEFAULT_RULES', () => {
       skipLosesTurn: true,
       allowWildDiscard: true,
       nextHandLeader: 'hand-winner',
+      everyoneAdvances: false,
     });
     expect(DEFAULT_RULES.levels).toBe(STANDARD_LEVELS);
   });

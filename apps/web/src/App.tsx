@@ -1,10 +1,12 @@
-import { Suspense, lazy, useCallback, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { rulesFromHouse } from '@tenfold/engine';
 import { COPY, apiErrorMessage } from './copy.ts';
 import { GameScreen } from './components/GameScreen.tsx';
 import { Home } from './components/Home.tsx';
 import type { GameClient } from './game/client.ts';
 import { createLocalGame } from './game/localGame.ts';
 import type { ApiResult } from './net/api.ts';
+import { applyTable, loadSettings } from './prefs.ts';
 import type { RoomSnapshot } from './net/room.ts';
 import { loadName, loadSavedRoom, saveName, saveRoom, type SavedRoom } from './net/savedRoom.ts';
 
@@ -33,6 +35,11 @@ export const App = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Home shows this device's last table; games and lobbies set their own.
+  useEffect(() => {
+    if (screen.kind === 'home') applyTable(loadSettings().table);
+  }, [screen.kind]);
+
   const enterRoom = async (request: Promise<ApiResult>, name: string) => {
     setBusy(true);
     setError(null);
@@ -45,6 +52,10 @@ export const App = () => {
       return;
     }
     const room = { roomId: result.roomId, code: result.code, playerId: result.playerId };
+    // A new room starts with the host's remembered house rules and table.
+    if (result.snapshot.data.hostPlayerId === result.playerId && result.snapshot.version === 1) {
+      void online().then((m) => m.callGame({ type: 'settings', roomId: room.roomId, settings: loadSettings() }));
+    }
     saveRoom(room);
     setScreen({ kind: 'lobby', room });
   };
@@ -76,9 +87,11 @@ export const App = () => {
           savedRoom={loadSavedRoom()}
           busy={busy}
           error={error}
-          onLocal={(opponents, level) => {
+          onLocal={(opponents, level, settings) => {
             const seed = seedFromUrl();
-            const client = createLocalGame({ opponents, level, ...(seed === undefined ? {} : { seed }) });
+            const config = rulesFromHouse(settings.rules);
+            applyTable(settings.table);
+            const client = createLocalGame({ opponents, level, config, ...(seed === undefined ? {} : { seed }) });
             setScreen({ kind: 'game', client, online: false });
           }}
           onCreate={(name) => void enterRoom(online().then((m) => m.callGame({ type: 'create', name })), name)}

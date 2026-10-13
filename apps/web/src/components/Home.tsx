@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { BOT_LEVELS, DEFAULT_RULES, type BotLevel } from '@tenfold/engine';
+import { BOT_LEVELS, levelsFor, type BotLevel } from '@tenfold/engine';
 import { unlockAudio } from '../audio.ts';
 import { COPY, describeLevel } from '../copy.ts';
+import type { RoomSettings } from '@tenfold/server';
 import type { SavedRoom } from '../net/savedRoom.ts';
+import { applyTable, loadSettings, saveSettings } from '../prefs.ts';
+import { RulesEditor } from './RulesEditor.tsx';
 import { useInstall } from '../install.ts';
 
 const OPPONENT_CHOICES = [1, 2, 3, 4, 5];
@@ -14,7 +17,7 @@ interface Props {
   readonly savedRoom: SavedRoom | null;
   readonly busy: boolean;
   readonly error: string | null;
-  readonly onLocal: (opponents: number, level: BotLevel) => void;
+  readonly onLocal: (opponents: number, level: BotLevel, settings: RoomSettings) => void;
   readonly onCreate: (name: string) => void;
   readonly onJoin: (name: string, code: string) => void;
 }
@@ -23,6 +26,12 @@ export const Home = (props: Props) => {
   const [mode, setMode] = useState<Mode>(props.initialCode || props.savedRoom ? 'friends' : 'computer');
   const [opponents, setOpponents] = useState(3);
   const [level, setLevel] = useState<BotLevel>('medium');
+  const [settings, setSettings] = useState(loadSettings);
+  const changeSettings = (next: RoomSettings) => {
+    setSettings(next);
+    saveSettings(next);
+    applyTable(next.table);
+  };
   const [name, setName] = useState(props.initialName);
   const [code, setCode] = useState(props.initialCode);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -103,11 +112,15 @@ export const Home = (props: Props) => {
             className="btn btn--primary btn--big"
             onClick={() => {
               unlockAudio();
-              props.onLocal(opponents, level);
+              props.onLocal(opponents, level, settings);
             }}
           >
             {COPY.start}
           </button>
+          <details className="rules-panel">
+            <summary>{COPY.houseRules}</summary>
+            <RulesEditor value={settings} onChange={changeSettings} showTimer={false} />
+          </details>
         </>
       ) : (
         <div className="friends">
@@ -188,7 +201,7 @@ export const Home = (props: Props) => {
       </dl>
 
       <ol className="levels">
-        {DEFAULT_RULES.levels.map((l) => (
+        {levelsFor(settings.rules.levelSet).map((l) => (
           <li key={l.number}>
             <span className="levels__n">{l.number}</span>
             {describeLevel(l.requirements)}

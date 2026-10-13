@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { cleanCode, cleanName, parseAction, parseMove } from './parse.ts';
+import { cleanCode, cleanName, parseAction, parseMove, parseSettings } from './parse.ts';
+import { DEFAULT_SETTINGS } from './rooms.ts';
 
 describe('cleanName', () => {
   it('trims, strips control characters and caps the length', () => {
@@ -108,5 +109,22 @@ describe('parseAction', () => {
     expect(parseAction({ type: 'join', code: 'AAAA', name: 'Al' })).toBeNull();
     expect(parseAction({ type: 'move', roomId: 'r1', move: { type: 'nope' } })).toBeNull();
     expect(parseAction({ type: 'delete-everything' })).toBeNull();
+  });
+});
+
+describe('parseSettings', () => {
+  it('accepts valid settings', () => {
+    expect(parseSettings(DEFAULT_SETTINGS)).toEqual(DEFAULT_SETTINGS);
+    expect(parseSettings({ ...DEFAULT_SETTINGS, turnSeconds: null, table: 'midnight' })).toMatchObject({
+      turnSeconds: null,
+      table: 'midnight',
+    });
+  });
+
+  it('rejects anything off the menu', () => {
+    expect(parseSettings({ ...DEFAULT_SETTINGS, turnSeconds: 5 })).toBeNull();
+    expect(parseSettings({ ...DEFAULT_SETTINGS, table: 'neon' })).toBeNull();
+    expect(parseSettings({ ...DEFAULT_SETTINGS, rules: { ...DEFAULT_SETTINGS.rules, levelSet: 'odd' } })).toBeNull();
+    expect(parseSettings({ ...DEFAULT_SETTINGS, rules: { ...DEFAULT_SETTINGS.rules, wildDiscard: 'yes' } })).toBeNull();
   });
 });

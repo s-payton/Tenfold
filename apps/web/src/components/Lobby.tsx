@@ -4,6 +4,9 @@ import { COPY, apiErrorMessage } from '../copy.ts';
 import { callGame } from '../net/api.ts';
 import { watchRoom, type RoomSnapshot } from '../net/room.ts';
 import { saveName } from '../net/savedRoom.ts';
+import type { RoomSettings } from '@tenfold/server';
+import { applyTable, saveSettings } from '../prefs.ts';
+import { RulesEditor } from './RulesEditor.tsx';
 
 interface Props {
   readonly roomId: string;
@@ -35,6 +38,11 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
     });
     return watch.stop;
   }, [roomId, onStarted]);
+
+  const table = snapshot?.data.settings.table;
+  useEffect(() => {
+    if (table) applyTable(table);
+  }, [table]);
 
   if (!snapshot) return <main className="lobby">{COPY.connecting}</main>;
 
@@ -79,6 +87,13 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
     const result = await callGame(action);
     if (result.ok) setSnapshot(result.snapshot);
     else setError(apiErrorMessage(result.error));
+  };
+
+  const changeSettings = (settings: RoomSettings) => {
+    // Show the change at once; the server's reply confirms it.
+    setSnapshot({ ...snapshot, data: { ...snapshot.data, settings } });
+    saveSettings(settings);
+    void act({ type: 'settings', roomId, settings });
   };
 
   const start = async () => {
@@ -183,6 +198,15 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
           {error}
         </p>
       )}
+      <details className="rules-panel" open={isHost}>
+        <summary>{COPY.houseRules}</summary>
+        {!isHost && <p className="rules__help">{COPY.houseRulesHint}</p>}
+        <RulesEditor
+          value={data.settings}
+          showTimer
+          {...(isHost ? { onChange: changeSettings } : {})}
+        />
+      </details>
       <button type="button" className="btn btn--ghost" onClick={onLeave}>
         {COPY.leave}
       </button>

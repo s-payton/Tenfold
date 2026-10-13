@@ -99,3 +99,9 @@ Measured before: about 500 to 600 ms per move at the function, plus a follow-up 
 - **Offline:** the service worker precaches the app shell, so games against the computer work with no connection. Online play needs the network, as expected.
 - **Install:** Chrome and Android get an "Install the app" button from `beforeinstallprompt`; iPhone gets a one-line Share, Add to Home Screen hint. Both hide once installed.
 - **Smaller first load:** everything that needs Supabase (`net/online.ts`, the lobby) is a lazy chunk loaded on first use of "Play with friends".
+
+## 2026-10-14: House rules and tables
+
+- **`HouseRules`** (engine) is the host's menu: hitting on others, Skips, Wild discards, who leads, game length (`all`, `first-5`, `first-7`, `even`, the last three from the rule sheet's variations, renumbered from 1), and "everyone moves up each hand" (the other rule sheet variation: all advance after every hand, lowest total score after the last level wins, ties go to the earlier seat). `rulesFromHouse` turns it into a `RulesConfig`.
+- **Room settings** (`RoomData.settings`): house rules, table theme, and time per move (30, 60, 90 seconds or no timer; computer seats keep their short clock either way). Host-only, lobby-only, validated by `parseSettings`, and every server action uses the room's own rules. A new room starts with the host's remembered settings.
+- **Tables** are five themes (green, blue and red felt, wood, midnight) as CSS variable sets behind `data-table` on the page root. Everyone in a room sees the host's choice; games against the computer use this device's choice.

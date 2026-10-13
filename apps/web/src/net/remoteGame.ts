@@ -1,4 +1,4 @@
-import { DEFAULT_RULES, predictView, type Move, type PublicView } from '@tenfold/engine';
+import { predictView, rulesFromHouse, type Move, type PublicView } from '@tenfold/engine';
 import type { GameClient, SendError } from '../game/client.ts';
 import { callGame } from './api.ts';
 import { watchRoom, type RoomSnapshot } from './room.ts';
@@ -23,6 +23,8 @@ export const createRemoteGame = (
   const names = Object.fromEntries(initial.data.players.map((p) => [p.id, p.name]));
   names[playerId] = 'You';
   let roomData = initial.data;
+  // Settings are fixed once the game starts.
+  const config = rulesFromHouse(initial.data.settings.rules);
   const listeners = new Set<() => void>();
   const notify = () => {
     for (const listener of listeners) listener();
@@ -71,7 +73,7 @@ export const createRemoteGame = (
 
   const send = async (move: Move): Promise<SendError | null> => {
     // Show the result now when it can be worked out without secret cards.
-    const guess = predictView(shown, move, DEFAULT_RULES);
+    const guess = predictView(shown, move, config);
     if (guess) {
       shown = guess;
       notify();
@@ -95,7 +97,7 @@ export const createRemoteGame = (
   };
 
   return {
-    config: DEFAULT_RULES,
+    config,
     myId: playerId,
     names,
     getView: () => shown,

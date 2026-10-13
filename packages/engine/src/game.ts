@@ -132,13 +132,32 @@ export const createGame = (
   return dealHand({ players, dealerIndex, handNumber: 1, seed, turn: 0 }, config);
 };
 
+/** The lowest total score wins; on a tie, the first such player in seat order. */
+const lowestScore = (players: readonly PlayerState[]): string | null =>
+  players.reduce<PlayerState | null>((best, p) => (!best || p.score < best.score ? p : best), null)
+    ?.id ?? null;
+
 /** Scores the hand after `winnerIndex` goes out and moves players up a level. */
 export const endHand = (state: GameState, winnerIndex: number, config: RulesConfig): GameState => {
   const finalLevel = config.levels.length;
   const winner = state.players[winnerIndex] as PlayerState;
-  const players = state.players.map((p) => ({
+  const scored = state.players.map((p) => ({ ...p, score: p.score + handPoints(p.hand) }));
+
+  if (config.everyoneAdvances) {
+    const lastHand = state.players.every((p) => p.level >= finalLevel);
+    const players = lastHand ? scored : scored.map((p) => ({ ...p, level: p.level + 1 }));
+    const winnerId = lastHand ? lowestScore(players) : null;
+    return {
+      ...state,
+      players,
+      status: lastHand ? 'game-over' : 'hand-over',
+      handWinnerId: winner.id,
+      winnerId,
+    };
+  }
+
+  const players = scored.map((p) => ({
     ...p,
-    score: p.score + handPoints(p.hand),
     level: p.laidDown && p.level < finalLevel ? p.level + 1 : p.level,
   }));
   const gameWon = winner.level === finalLevel;

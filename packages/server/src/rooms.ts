@@ -1,5 +1,5 @@
 import {
-  DEFAULT_RULES,
+  DEFAULT_HOUSE_RULES,
   MAX_PLAYERS,
   MIN_PLAYERS,
   applyMove,
@@ -7,12 +7,14 @@ import {
   botMove,
   createGame,
   publicView,
+  rulesFromHouse,
   startNextHand,
   tableView,
   type BotLevel,
   type Card,
   type GameState,
   type MoveResult,
+  type RulesConfig,
 } from '@tenfold/engine';
 import { ROOM_CODE_LENGTH, ROOM_CODE_LETTERS } from './parse.ts';
 import type {
@@ -20,17 +22,24 @@ import type {
   ActionResult,
   Deps,
   RoomPlayer,
+  RoomSettings,
   RoomSnapshot,
   ServerError,
   Store,
   StoredRoom,
 } from './types.ts';
 
-const rules = DEFAULT_RULES;
+export const DEFAULT_SETTINGS: RoomSettings = {
+  rules: DEFAULT_HOUSE_RULES,
+  table: 'green',
+  turnSeconds: 30,
+};
+
+/** The rules this room plays by. */
+export const roomRules = (room: StoredRoom): RulesConfig => rulesFromHouse(room.data.settings.rules);
+
 const CODE_ATTEMPTS = 20;
 const SAVE_ATTEMPTS = 3;
-/** Longest stretch a person may go without making a move on their turn. */
-export const TURN_MS = 30_000;
 /** Pause before a computer seat plays, so people can follow along. */
 export const BOT_TURN_MS = 1_200;
 /** Missed turns in a row before a bot takes over the seat. */
@@ -92,8 +101,9 @@ const updateSeat = (room: StoredRoom, playerId: string, change: Partial<RoomPlay
 /** Stores a game state, refreshes the public table, and starts the clock for whoever is up. */
 const withGame = (room: StoredRoom, game: GameState, now: number): StoredRoom => {
   const current = seatOf(room, game.players[game.currentIndex]?.id);
-  const turnDeadline =
-    game.status === 'playing' ? now + (current?.bot ? BOT_TURN_MS : TURN_MS) : null;
+  const personMs = room.data.settings.turnSeconds === null ? null : room.data.settings.turnSeconds * 1000;
+  const turnMs = current?.bot ? BOT_TURN_MS : personMs;
+  const turnDeadline = game.status === 'playing' && turnMs !== null ? now + turnMs : null;
   return {
     ...room,
     game,
@@ -150,6 +160,7 @@ const create = async (store: Store, deps: Deps, userId: string, name: string): P
         code,
         status: 'lobby',
         hostPlayerId: playerId,
+        settings: DEFAULT_SETTINGS,
         players: [newSeat(playerId, name, null)],
         table: null,
         turnDeadline: null,
@@ -201,7 +212,7 @@ const start = (deps: Deps, userId: string) => (room: StoredRoom): Change => {
   if (room.data.players.length < MIN_PLAYERS) return refuse('not-enough-players');
   const seats = room.data.players.map((p) => p.id);
   const seed = Math.floor(deps.random() * 0x100000000);
-  return { ok: true, playerId, room: withGame(room, createGame(seats, rules, seed), deps.now()) };
+  return { ok: true, playerId, room: withGame(room, createGame(seats, roomRules(room), seed), deps.now()) };
 };
 
 const addBot = (deps: Deps, userId: string, level: BotLevel) => (room: StoredRoom): Change => {
@@ -261,7 +272,13 @@ const reclaim = (deps: Deps, userId: string) => (room: StoredRoom): Change => {
 };
 
 /** Plays the current turn for whoever is up: their bot, or the timeout auto-play. */
-const playTurnFor = (game: GameState, playerId: string, level: BotLevel | null, deps: Deps): GameState => {
+const playTurnFor = (
+  game: GameState,
+  playerId: string,
+  level: BotLevel | null,
+  rules: RulesConfig,
+  deps: Deps,
+): GameState => {
   let state = game;
   for (let i = 0; i < MAX_AUTO_MOVES && state.status === 'playing' && state.turn === game.turn; i++) {
     const view = publicView(state, playerId);
@@ -283,7 +300,7 @@ const timeout = (deps: Deps, userId: string) => (room: StoredRoom): Change => {
   const currentId = game.players[game.currentIndex]?.id ?? '';
   const seat = seatOf(room, currentId);
   const level = seat?.bot ?? null;
-  const played = playTurnFor(game, currentId, level, deps);
+  const played = playTurnFor(game, currentId, level, roomRules(room), deps);
   let next = room;
   if (!level && seat) {
     const missed = seat.missed + 1;
@@ -296,12 +313,12 @@ const timeout = (deps: Deps, userId: string) => (room: StoredRoom): Change => {
 };
 
 const play =
-  (deps: Deps, userId: string, run: (game: GameState, playerId: string) => MoveResult) =>
+  (deps: Deps, userId: string, run: (game: GameState, playerId: string, rules: RulesConfig) => MoveResult) =>
   (room: StoredRoom): Change => {
     const playerId = memberOf(room, userId);
     if (!playerId) return refuse('not-a-member');
     if (!room.game) return refuse('not-started');
-    const result = run(room.game, playerId);
+    const result = run(room.game, playerId, roomRules(room));
     if (!result.ok) return { ok: false, error: { code: 'move-rejected', error: result.error } };
     // A person who moves is clearly here: clear their misses and any stand-in bot.
     const active = updateSeat(room, playerId, { missed: 0, bot: null });
@@ -324,9 +341,13 @@ export const handle = async (
     case 'start':
       return mutate(store, byId, start(deps, userId));
     case 'move':
-      return mutate(store, byId, play(deps, userId, (game, id) => applyMove(game, id, action.move, rules)));
+      return mutate(
+        store,
+        byId,
+        play(deps, userId, (game, id, rules) => applyMove(game, id, action.move, rules)),
+      );
     case 'next-hand':
-      return mutate(store, byId, play(deps, userId, (game) => startNextHand(game, rules)));
+      return mutate(store, byId, play(deps, userId, (game, _id, rules) => startNextHand(game, rules)));
     case 'timeout':
       return mutate(store, byId, timeout(deps, userId));
     case 'reclaim':
@@ -337,5 +358,11 @@ export const handle = async (
       return mutate(store, byId, addBot(deps, userId, action.level));
     case 'remove':
       return mutate(store, byId, remove(userId, action.playerId));
+    case 'settings':
+      return mutate(store, byId, (room) => {
+        const playerId = hostInLobby(room, userId);
+        if (typeof playerId !== 'string') return playerId;
+        return { ok: true, playerId, room: { ...room, data: { ...room.data, settings: action.settings } } };
+      });
   }
 };

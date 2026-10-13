@@ -12,3 +12,4 @@ export * from './auto.ts';
 export * from './solver.ts';
 export * from './predict.ts';
 export * from './bots.ts';
+export * from './house.ts';

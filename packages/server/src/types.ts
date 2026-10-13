@@ -1,4 +1,4 @@
-import type { BotLevel, Card, GameState, Move, MoveError, TableView } from '@tenfold/engine';
+import type { BotLevel, Card, GameState, HouseRules, Move, MoveError, TableView } from '@tenfold/engine';
 
 export type RoomStatus = 'lobby' | 'playing' | 'finished';
 
@@ -15,11 +15,27 @@ export interface RoomPlayer {
   readonly missed: number;
 }
 
+/** Table backgrounds a host can pick. */
+export const TABLE_THEMES = ['green', 'blue', 'red', 'wood', 'midnight'] as const;
+export type TableTheme = (typeof TABLE_THEMES)[number];
+
+/** Seconds a person gets per move, or null for no clock. */
+export const TURN_SECONDS = [30, 60, 90, null] as const;
+export type TurnSeconds = (typeof TURN_SECONDS)[number];
+
+/** What the host chooses before the game starts. */
+export interface RoomSettings {
+  readonly rules: HouseRules;
+  readonly table: TableTheme;
+  readonly turnSeconds: TurnSeconds;
+}
+
 /** Everything members of a room may see. Published to the `room_states` table. */
 export interface RoomData {
   readonly code: string;
   readonly status: RoomStatus;
   readonly hostPlayerId: string;
+  readonly settings: RoomSettings;
   readonly players: readonly RoomPlayer[];
   readonly table: TableView | null;
   /** When the current turn times out, in epoch milliseconds. Null when nobody is on the clock. */
@@ -70,7 +86,8 @@ export type Action =
   | { readonly type: 'reclaim'; readonly roomId: string }
   | { readonly type: 'leave'; readonly roomId: string }
   | { readonly type: 'add-bot'; readonly roomId: string; readonly level: BotLevel }
-  | { readonly type: 'remove'; readonly roomId: string; readonly playerId: string };
+  | { readonly type: 'remove'; readonly roomId: string; readonly playerId: string }
+  | { readonly type: 'settings'; readonly roomId: string; readonly settings: RoomSettings };
 
 export type ServerError =
   | {

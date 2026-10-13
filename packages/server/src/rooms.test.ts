@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RULES, basicMove, createRng, getLevel, publicView } from '@tenfold/engine';
 import { createMemoryStore } from './memory-store.ts';
-import { BOT_TURN_MS, TURN_MS, handle, handsOf } from './rooms.ts';
+import { BOT_TURN_MS, DEFAULT_SETTINGS, handle, handsOf, roomRules } from './rooms.ts';
+
+const TURN_MS = 30_000;
 import type { ActionResult, Deps, StoredRoom } from './types.ts';
 
 const setup = (seed = 1) => {
@@ -52,6 +54,7 @@ describe('create', () => {
       code: result.code,
       status: 'lobby',
       hostPlayerId: result.playerId,
+      settings: DEFAULT_SETTINGS,
       players: [{ id: result.playerId, name: 'Sam', seat: 0, bot: null, missed: 0 }],
       table: null,
       turnDeadline: null,
@@ -391,5 +394,56 @@ describe('lobby controls', () => {
       ok: false,
       error: { code: 'not-in-lobby' },
     });
+  });
+});
+
+describe('room settings', () => {
+  const custom = {
+    rules: {
+      hitOnOthers: false,
+      skipLosesTurn: true,
+      wildDiscard: false,
+      nextHandLeader: 'left-of-dealer',
+      levelSet: 'first-5',
+      everyoneAdvances: true,
+    },
+    table: 'wood',
+    turnSeconds: 60,
+  } as const;
+
+  it('only the host can change them, and only in the lobby', async () => {
+    const t = await lobby(2);
+    expect(await t.act('u1', { type: 'settings', roomId: t.roomId, settings: custom })).toEqual({
+      ok: false,
+      error: { code: 'not-host' },
+    });
+    okResult(await t.act('u0', { type: 'settings', roomId: t.roomId, settings: custom }));
+    expect(roomOf(t.rooms, t.roomId).data.settings).toEqual(custom);
+    okResult(await t.act('u0', { type: 'start', roomId: t.roomId }));
+    expect(await t.act('u0', { type: 'settings', roomId: t.roomId, settings: DEFAULT_SETTINGS })).toEqual({
+      ok: false,
+      error: { code: 'not-in-lobby' },
+    });
+  });
+
+  it('the game plays by the chosen rules and clock', async () => {
+    const t = await lobby(2);
+    okResult(await t.act('u0', { type: 'settings', roomId: t.roomId, settings: custom }));
+    okResult(await t.act('u0', { type: 'start', roomId: t.roomId }));
+    const room = roomOf(t.rooms, t.roomId);
+    expect(roomRules(room)).toMatchObject({ allowHitOnOthers: false, allowWildDiscard: false, everyoneAdvances: true });
+    expect(roomRules(room).levels).toHaveLength(5);
+    expect(room.data.turnDeadline).toBe(t.now() + 60_000);
+  });
+
+  it('with the clock off, people have no deadline but computer seats still play', async () => {
+    const t = setup();
+    const host = okResult(await t.act('u0', { type: 'create', name: 'Host' }));
+    okResult(await t.act('u0', { type: 'settings', roomId: host.roomId, settings: { ...DEFAULT_SETTINGS, turnSeconds: null } }));
+    okResult(await t.act('u0', { type: 'add-bot', roomId: host.roomId, level: 'easy' }));
+    okResult(await t.act('u0', { type: 'start', roomId: host.roomId }));
+    const room = roomOf(t.rooms, host.roomId);
+    const botUp = room.data.players.find((p) => p.id === room.game?.players[room.game.currentIndex]?.id)?.bot;
+    expect(room.data.turnDeadline).toBe(botUp ? t.now() + BOT_TURN_MS : null);
   });
 });

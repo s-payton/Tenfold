@@ -17,6 +17,11 @@ export interface RulesConfig {
    * the owner's choice). 'left-of-dealer': the deal passes left, as on the rule sheet.
    */
   readonly nextHandLeader: 'hand-winner' | 'left-of-dealer';
+  /**
+   * Rule sheet variation: everyone moves up a level after every hand, whether they made it
+   * or not, and after the last level the lowest total score wins.
+   */
+  readonly everyoneAdvances: boolean;
 }
 
 export const DEFAULT_RULES: RulesConfig = {
@@ -27,4 +32,5 @@ export const DEFAULT_RULES: RulesConfig = {
   skipLosesTurn: true,
   allowWildDiscard: true,
   nextHandLeader: 'hand-winner',
+  everyoneAdvances: false,
 };

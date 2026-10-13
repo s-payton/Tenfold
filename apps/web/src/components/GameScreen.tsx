@@ -19,6 +19,7 @@ import { useGameSounds } from '../game/useGameSounds.ts';
 import { useGameView } from '../game/useGameView.ts';
 import { useRoomData } from '../game/useRoomData.ts';
 import { buzz } from '../haptics.ts';
+import { applyTable } from '../prefs.ts';
 import { Hand } from './Hand.tsx';
 import { HandOver } from './HandOver.tsx';
 import { LayDownBuilder, type BuilderSlot } from './LayDownBuilder.tsx';
@@ -48,8 +49,6 @@ interface Props {
 }
 
 const SKIP_FLASH_MS = 1900;
-/** Matches the server's turn length; only used to size the clock bar. */
-const TURN_MS = 30_000;
 
 const isCard = (c: CardData | undefined): c is CardData => c !== undefined;
 
@@ -272,7 +271,11 @@ export const GameScreen = ({ client, onExit }: Props) => {
 
   const mySeat = room?.players.find((p) => p.id === myId);
   const currentSeat = room?.players.find((p) => p.id === current?.id);
-  const clockTotal = currentSeat?.bot ? 1200 : TURN_MS;
+  const clockTotal = (room?.settings.turnSeconds ?? 30) * 1000;
+  const table = room?.settings.table;
+  useEffect(() => {
+    if (table) applyTable(table);
+  }, [table]);
 
   const exit = () => {
     if (client.leave && view.status === 'playing') setConfirmLeave(true);

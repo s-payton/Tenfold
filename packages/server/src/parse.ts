@@ -1,4 +1,5 @@
-import { BOT_LEVELS, type BotLevel, type Move } from '@tenfold/engine';
+import { BOT_LEVELS, LEVEL_SETS, type BotLevel, type HouseRules, type Move } from '@tenfold/engine';
+import { TABLE_THEMES, TURN_SECONDS, type RoomSettings } from './types.ts';
 import type { Action } from './types.ts';
 
 export const MAX_NAME_LENGTH = 16;
@@ -74,6 +75,37 @@ export const parseMove = (input: unknown): Move | null => {
   }
 };
 
+const oneOf = <T>(options: readonly T[], value: unknown): T | undefined =>
+  options.find((o) => o === value);
+
+const parseHouseRules = (input: unknown): HouseRules | null => {
+  if (!isRecord(input)) return null;
+  const { hitOnOthers, skipLosesTurn, wildDiscard, everyoneAdvances } = input;
+  const nextHandLeader = oneOf(['hand-winner', 'left-of-dealer'] as const, input.nextHandLeader);
+  const levelSet = oneOf(LEVEL_SETS, input.levelSet);
+  if (
+    typeof hitOnOthers !== 'boolean' ||
+    typeof skipLosesTurn !== 'boolean' ||
+    typeof wildDiscard !== 'boolean' ||
+    typeof everyoneAdvances !== 'boolean' ||
+    !nextHandLeader ||
+    !levelSet
+  ) {
+    return null;
+  }
+  return { hitOnOthers, skipLosesTurn, wildDiscard, everyoneAdvances, nextHandLeader, levelSet };
+};
+
+/** Turns untrusted room settings into well-formed ones, or null. */
+export const parseSettings = (input: unknown): RoomSettings | null => {
+  if (!isRecord(input)) return null;
+  const rules = parseHouseRules(input.rules);
+  const table = oneOf(TABLE_THEMES, input.table);
+  const turnSeconds = TURN_SECONDS.find((t) => t === input.turnSeconds);
+  if (!rules || !table || turnSeconds === undefined) return null;
+  return { rules, table, turnSeconds };
+};
+
 /** Turns an untrusted request body into an Action, or null. */
 export const parseAction = (input: unknown): Action | null => {
   if (!isRecord(input)) return null;
@@ -96,6 +128,10 @@ export const parseAction = (input: unknown): Action | null => {
     case 'add-bot': {
       const level = BOT_LEVELS.find((l): l is BotLevel => l === input.level);
       return isId(input.roomId) && level ? { type: 'add-bot', roomId: input.roomId, level } : null;
+    }
+    case 'settings': {
+      const settings = parseSettings(input.settings);
+      return isId(input.roomId) && settings ? { type: 'settings', roomId: input.roomId, settings } : null;
     }
     case 'remove':
       return isId(input.roomId) && isId(input.playerId)
