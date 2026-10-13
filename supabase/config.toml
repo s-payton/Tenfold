@@ -4,3 +4,6 @@ project_id = "tenfold"
 [functions.game]
 # The function verifies the caller's session itself, so the gateway check is off.
 verify_jwt = false
+
+[functions.play]
+verify_jwt = false

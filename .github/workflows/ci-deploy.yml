@@ -90,4 +90,5 @@ jobs:
           echo "::add-mask::$password"
           supabase db push --db-url "postgresql://postgres.${PROJECT_REF}:${password}@${DB_POOLER_HOST}:5432/postgres"
       - if: steps.secrets.outputs.ready == 'true'
-        run: supabase functions deploy game --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
+        # Deploys every function in supabase/functions (folders starting with _ are shared code).
+        run: supabase functions deploy --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
