@@ -11,3 +11,4 @@ export * from './view.ts';
 export * from './auto.ts';
 export * from './solver.ts';
 export * from './predict.ts';
+export * from './bots.ts';
