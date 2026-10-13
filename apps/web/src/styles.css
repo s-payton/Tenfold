@@ -841,6 +841,11 @@ button.card {
   * {
     transition: none !important;
   }
+
+  .me--active {
+    animation: none;
+    box-shadow: inset 0 14px 34px -12px rgb(252 181 43 / 0.5);
+  }
 }
 
 /* Home: mode tabs and friends form */
@@ -1249,3 +1254,49 @@ input:focus {
 .swatch--red { background: radial-gradient(circle, #a32d3e, #4a111c); }
 .swatch--wood { background: radial-gradient(circle, #8b5a2b, #3b2412); }
 .swatch--midnight { background: radial-gradient(circle, #343a5c, #11142a); }
+
+/* Updates and version */
+
+.updatebar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  top: calc(8px + env(safe-area-inset-top));
+  z-index: 40;
+  margin: 0 auto;
+  max-width: 440px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.home__version {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  opacity: 0.7;
+}
+
+/* Your turn: the whole play area glows. */
+
+.me--active {
+  border-top: 2px solid var(--accent);
+  animation: turn-glow 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes turn-glow {
+  from {
+    box-shadow: inset 0 14px 30px -14px rgb(252 181 43 / 0.35), 0 -6px 24px -8px rgb(252 181 43 / 0.45);
+    background: linear-gradient(to top, rgb(252 181 43 / 0.1), rgb(0 0 0 / 0.25));
+  }
+  to {
+    box-shadow: inset 0 14px 40px -10px rgb(252 181 43 / 0.55), 0 -8px 32px -6px rgb(252 181 43 / 0.7);
+    background: linear-gradient(to top, rgb(252 181 43 / 0.18), rgb(0 0 0 / 0.25));
+  }
+}

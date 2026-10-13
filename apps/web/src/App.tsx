@@ -7,6 +7,7 @@ import type { GameClient } from './game/client.ts';
 import { createLocalGame } from './game/localGame.ts';
 import type { ApiResult } from './net/api.ts';
 import { applyTable, loadSettings } from './prefs.ts';
+import { applyUpdate, useUpdateReady } from './update.ts';
 import type { RoomSnapshot } from './net/room.ts';
 import { loadName, loadSavedRoom, saveName, saveRoom, type SavedRoom } from './net/savedRoom.ts';
 
@@ -34,6 +35,12 @@ export const App = () => {
   const [screen, setScreen] = useState<Screen>({ kind: 'home' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // A new version applies itself on the home screen; elsewhere the player chooses when.
+  const updateReady = useUpdateReady();
+  useEffect(() => {
+    if (updateReady && screen.kind === 'home') void applyUpdate(true);
+  }, [updateReady, screen.kind]);
 
   // Home shows this device's last table; games and lobbies set their own.
   useEffect(() => {
@@ -112,6 +119,14 @@ export const App = () => {
         </Suspense>
       )}
       {screen.kind === 'game' && <GameScreen client={screen.client} onExit={goHome} />}
+      {updateReady && screen.kind !== 'home' && (
+        <div className="updatebar" role="status">
+          <span>{COPY.updateReady}</span>
+          <button type="button" className="btn btn--small btn--primary" onClick={() => void applyUpdate(true)}>
+            {COPY.updateNow}
+          </button>
+        </div>
+      )}
       <div className="rotate" aria-hidden="true">
         {COPY.rotate}
       </div>

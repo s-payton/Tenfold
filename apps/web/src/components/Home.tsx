@@ -212,6 +212,7 @@ export const Home = (props: Props) => {
           </li>
         ))}
       </ol>
+      <p className="home__version">{COPY.version(__APP_VERSION__)}</p>
     </main>
   );
 };

@@ -113,3 +113,9 @@ Measured before: about 500 to 600 ms per move at the function, plus a follow-up 
 - **Draws feel instant:** a face-down card flies into the hand on tap (or the known discard, when taking it), replaced by the real card when the server answers.
 - **Smaller first download:** framer-motion runs through `LazyMotion` with `m` components, and its features load right after first paint. Main bundle 138 kB to 112 kB gzipped.
 - **Prefetch:** opening "Play with friends" starts loading the online code.
+
+## 2026-10-14: Keeping every phone on the same version
+
+- **Why:** after the app became installable, phones kept running their saved copy until fully closed. In a playtest, the host had the newest build while other players still ran one without auto lay-down or the skip animation, which looked like bugs that only hit guests. A live two-phone test on the current build showed both features working for host and guest.
+- **Now:** the service worker uses `registerType: 'prompt'`. The app checks for a new version on open, when it returns to the foreground, and every 15 minutes. On the home screen it reloads straight away; anywhere else it shows an "Update" bar so a game is never interrupted. The home screen shows the build date and commit so players can compare versions.
+- **Turn glow:** the player's own area pulses gold on their turn (a steady glow with reduced motion).
