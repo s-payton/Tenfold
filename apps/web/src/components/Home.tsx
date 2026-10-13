@@ -154,6 +154,15 @@ export const Home = (props: Props) => {
         </div>
       )}
 
+      <dl className="glossary">
+        {COPY.glossary.map(([term, meaning]) => (
+          <div key={term}>
+            <dt>{term}</dt>
+            <dd>{meaning}</dd>
+          </div>
+        ))}
+      </dl>
+
       <ol className="levels">
         {DEFAULT_RULES.levels.map((l) => (
           <li key={l.number}>

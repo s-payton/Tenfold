@@ -43,6 +43,10 @@ export interface GameState {
   readonly status: GameStatus;
   readonly handWinnerId: string | null;
   readonly winnerId: string | null;
+  /** Counts turn changes for the whole game, so screens can tell a new turn from a re-send. */
+  readonly turn: number;
+  /** Players who lost their turn in the most recent turn change. */
+  readonly lastSkipped: readonly string[];
   /** Seed for the next shuffle. Secret: it predicts the draw pile. */
   readonly seed: number;
 }
@@ -52,17 +56,26 @@ export const nextSeed = (rng: Rng): number => Math.floor(rng() * 0x100000000);
 /** Moves the turn to the next player clockwise, using up any pending skips on the way. */
 export const advanceTurn = (state: GameState): GameState => {
   const players = [...state.players];
+  const skipped: string[] = [];
   let index = state.currentIndex;
   for (;;) {
     index = (index + 1) % players.length;
     const player = players[index] as PlayerState;
     if (!player.skipPending) break;
     players[index] = { ...player, skipPending: false };
+    skipped.push(player.id);
   }
-  return { ...state, players, currentIndex: index, step: 'draw' };
+  return {
+    ...state,
+    players,
+    currentIndex: index,
+    step: 'draw',
+    turn: state.turn + 1,
+    lastSkipped: skipped,
+  };
 };
 
-type HandSetup = Pick<GameState, 'players' | 'dealerIndex' | 'handNumber' | 'seed'>;
+type HandSetup = Pick<GameState, 'players' | 'dealerIndex' | 'handNumber' | 'seed' | 'turn'>;
 
 const dealHand = (setup: HandSetup, config: RulesConfig): GameState => {
   const rng = createRng(setup.seed);
@@ -92,6 +105,7 @@ const dealHand = (setup: HandSetup, config: RulesConfig): GameState => {
     status: 'playing',
     handWinnerId: null,
     winnerId: null,
+    lastSkipped: [],
     seed: nextSeed(rng),
   });
 };
@@ -115,7 +129,7 @@ export const createGame = (
     laidDown: false,
     skipPending: false,
   }));
-  return dealHand({ players, dealerIndex, handNumber: 1, seed }, config);
+  return dealHand({ players, dealerIndex, handNumber: 1, seed, turn: 0 }, config);
 };
 
 /** Scores the hand after `winnerIndex` goes out and moves players up a level. */
@@ -154,6 +168,7 @@ export const startNextHand = (state: GameState, config: RulesConfig): MoveResult
     dealerIndex: nextDealer(state, config),
     handNumber: state.handNumber + 1,
     seed: state.seed,
+    turn: state.turn,
   };
   return { ok: true, state: dealHand(setup, config) };
 };

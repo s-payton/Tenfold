@@ -35,6 +35,10 @@ describe('publicView', () => {
     expect(view).not.toHaveProperty('drawPile');
   });
 
+  it('shares the turn number and who was just skipped', () => {
+    expect(publicView(state, 'a')).toMatchObject({ turn: state.turn, lastSkipped: state.lastSkipped });
+  });
+
   it('gives a spectator no hand', () => {
     expect(publicView(state, 'nobody').hand).toEqual([]);
   });

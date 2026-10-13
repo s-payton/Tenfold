@@ -1,7 +1,16 @@
 import { Howl, Howler } from 'howler';
 
 /** All sounds are synthesized here, so there are no audio files to license. */
-export type SoundName = 'select' | 'deal' | 'draw' | 'discard' | 'turn' | 'laydown' | 'win' | 'error';
+export type SoundName =
+  | 'select'
+  | 'deal'
+  | 'draw'
+  | 'discard'
+  | 'turn'
+  | 'laydown'
+  | 'win'
+  | 'error'
+  | 'skip';
 
 const RATE = 22050;
 
@@ -65,6 +74,7 @@ const RECIPES: Record<SoundName, () => Float32Array> = {
       mix(tone(523, 0, 0.2), tone(659, 0.15, 0.2), tone(784, 0.3, 0.2), tone(1047, 0.45, 0.5)),
     ),
   error: () => render(0.18, tone(170, 0, 0.18, 0.3)),
+  skip: () => render(0.5, mix(tone(520, 0, 0.16), tone(390, 0.14, 0.16), tone(260, 0.28, 0.22))),
 };
 
 let sounds: Partial<Record<SoundName, Howl>> | null = null;

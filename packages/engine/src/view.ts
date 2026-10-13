@@ -24,6 +24,8 @@ export interface TableView {
   readonly status: GameStatus;
   readonly handWinnerId: string | null;
   readonly winnerId: string | null;
+  readonly turn: number;
+  readonly lastSkipped: readonly string[];
 }
 
 /** What one player is allowed to see: the shared table plus their own hand. */
@@ -52,6 +54,8 @@ export const tableView = (state: GameState): TableView => ({
   status: state.status,
   handWinnerId: state.handWinnerId,
   winnerId: state.winnerId,
+  turn: state.turn,
+  lastSkipped: state.lastSkipped,
 });
 
 export const publicView = (state: GameState, viewerId: string): PublicView => ({

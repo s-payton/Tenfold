@@ -30,6 +30,15 @@ describe('findLevel', () => {
     expectValid(1, cards(5, 5, 5, 9, 9, 9, 1, 2, 3, 4, 7));
   });
 
+  it('prefers real cards over wilds, and high cards over low ones', () => {
+    const hand = cards(3, 3, 'W', 6, 6, 6, 11, 11, 11, 1, 2);
+    const groups = findLevel(hand, level(1), rules);
+    expect(groups?.map((g) => g.map((c) => (c.kind === 'number' ? c.value : c.kind)))).toEqual([
+      [11, 11, 11],
+      [6, 6, 6],
+    ]);
+  });
+
   it('finds two sets of the same number', () => {
     expectValid(1, cards(5, 5, 5, 5, 5, 5, 1, 2, 3, 4, 7));
   });

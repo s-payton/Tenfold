@@ -4,6 +4,7 @@ import type { TableGroup } from './game.ts';
 import { hit } from './hitting.ts';
 import type { GroupRequirement, LevelDefinition } from './levels.ts';
 import type { Move } from './moves.ts';
+import { cardPoints } from './scoring.ts';
 import { validateLevel } from './validation.ts';
 
 type Pool = { readonly naturals: readonly NumberCard[]; readonly wilds: readonly Card[] };
@@ -61,15 +62,27 @@ const colorCandidates = (pool: Pool, size: number): Card[][] =>
       : [];
   });
 
+const wildCount = (group: readonly Card[]) => group.filter((c) => c.kind === 'wild').length;
+const naturalPoints = (group: readonly Card[]) =>
+  group.reduce((sum, c) => sum + (isNatural(c) ? cardPoints(c) : 0), 0);
+
+/**
+ * Every candidate group, best first: fewest wilds (they are worth keeping for hits), then
+ * the most points laid down (so fewer are left in hand). The order never changes whether a
+ * level is found, only which way.
+ */
 const candidates = (pool: Pool, requirement: GroupRequirement): Card[][] => {
-  switch (requirement.type) {
-    case 'set':
-      return setCandidates(pool, requirement.size);
-    case 'run':
-      return runCandidates(pool, requirement.size);
-    case 'color':
-      return colorCandidates(pool, requirement.size);
-  }
+  const all = (() => {
+    switch (requirement.type) {
+      case 'set':
+        return setCandidates(pool, requirement.size);
+      case 'run':
+        return runCandidates(pool, requirement.size);
+      case 'color':
+        return colorCandidates(pool, requirement.size);
+    }
+  })();
+  return all.sort((a, b) => wildCount(a) - wildCount(b) || naturalPoints(b) - naturalPoints(a));
 };
 
 const search = (

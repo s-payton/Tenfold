@@ -43,6 +43,8 @@ export const predictView = (view: PublicView, move: Move, config: RulesConfig): 
     status: view.status,
     handWinnerId: view.handWinnerId,
     winnerId: view.winnerId,
+    turn: view.turn,
+    lastSkipped: view.lastSkipped,
     seed: 0,
   };
   const result = applyMove(state, view.viewerId, move, config);

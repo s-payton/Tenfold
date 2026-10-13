@@ -92,6 +92,7 @@ describe('createGame', () => {
     const s = createGame(ids(4), rules, seed, 0);
     expect(s.currentIndex).toBe(2);
     expect(s.players.every((p) => !p.skipPending)).toBe(true);
+    expect(s.lastSkipped).toEqual(['b']);
   });
 
   it('is reproducible from the seed', () => {
@@ -388,11 +389,25 @@ describe('skips', () => {
 
   it('makes the chosen player lose their next turn', () => {
     const { card, hand } = skipHand();
-    const s = ok(
-      play(rig({ hands: [hand] }), 'a', { type: 'discard', cardId: card.id, skipTarget: 'b' }),
-    );
+    const before = rig({ hands: [hand] });
+    const s = ok(play(before, 'a', { type: 'discard', cardId: card.id, skipTarget: 'b' }));
     expect(s.currentIndex).toBe(2);
     expect(s.players[1]?.skipPending).toBe(false);
+    expect(s.lastSkipped).toEqual(['b']);
+    expect(s.turn).toBe(before.turn + 1);
+  });
+
+  it('records no skip on an ordinary turn change', () => {
+    const hand = cards(3, 8);
+    const s = ok(play(rig({ hands: [hand] }), 'a', { type: 'discard', cardId: hand[0]?.id ?? '' }));
+    expect(s.lastSkipped).toEqual([]);
+  });
+
+  it('keeps the turn number through lay-downs and hits, which do not pass the turn', () => {
+    const hand = cards(5, 5, 5, 7, 7, 7, 2, 9);
+    const before = rig({ hands: [hand] });
+    const groups = [hand.slice(0, 3).map((c) => c.id), hand.slice(3, 6).map((c) => c.id)];
+    expect(ok(play(before, 'a', { type: 'lay-down', groups })).turn).toBe(before.turn);
   });
 
   it('can target a player who is not next', () => {
@@ -425,7 +440,7 @@ describe('skips', () => {
     const s = ok(
       play(rig({ hands: [hand] }, 2), 'a', { type: 'discard', cardId: card.id, skipTarget: 'b' }),
     );
-    expect(s).toMatchObject({ currentIndex: 0, step: 'draw' });
+    expect(s).toMatchObject({ currentIndex: 0, step: 'draw', lastSkipped: ['b'] });
   });
 
   it('has no effect and needs no target when skipLosesTurn is off', () => {

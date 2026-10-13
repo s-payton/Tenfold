@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   arrangeRun,
+  findLevel,
   getLevel,
   hit,
   validateGroup,
@@ -23,16 +24,28 @@ import { LayDownBuilder, type BuilderSlot } from './LayDownBuilder.tsx';
 import { Opponents } from './Opponents.tsx';
 import { Piles } from './Piles.tsx';
 import { Sheet, type SheetOption } from './Sheet.tsx';
+import { SkipFlash } from './SkipFlash.tsx';
 import { TableArea } from './TableArea.tsx';
 
 type Pending =
   | { readonly kind: 'skip'; readonly cardId: string }
   | { readonly kind: 'wild-end'; readonly cardId: string; readonly groupId: string };
 
+interface Building {
+  /** Card ids per level group. */
+  readonly slots: readonly (readonly string[])[];
+  /** The box that tapped hand cards go into. */
+  readonly active: number;
+  /** Which arrangement each run box uses, when wilds could go more than one way. */
+  readonly shifts: readonly number[];
+}
+
 interface Props {
   readonly client: GameClient;
   readonly onExit: () => void;
 }
+
+const SKIP_FLASH_MS = 1900;
 
 const isCard = (c: CardData | undefined): c is CardData => c !== undefined;
 
@@ -44,6 +57,9 @@ const fitsGroup = (group: LaidGroup, card: CardData, config: RulesConfig): boole
   return result.ok || result.error === 'needs-position';
 };
 
+const listNames = (names: readonly string[]): string =>
+  names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}`;
+
 export const GameScreen = ({ client, onExit }: Props) => {
   const view = useGameView(client);
   const { config, names, myId } = client;
@@ -53,19 +69,39 @@ export const GameScreen = ({ client, onExit }: Props) => {
   const canDraw = isMyTurn && view.step === 'draw';
   const canPlay = isMyTurn && view.step === 'play';
 
-  const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>('color');
-  const [slots, setSlots] = useState<readonly (readonly string[])[] | null>(null);
-  const [shifts, setShifts] = useState<readonly number[]>([]);
+  const [building, setBuilding] = useState<Building | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [muted, setMutedState] = useState(false);
+  const [drawing, setDrawing] = useState(false);
   const [handStart, setHandStart] = useState({ hand: view.handNumber, levels: levelsOf(view) });
+  const [seenTurn, setSeenTurn] = useState(view.turn);
+  const [skipFlash, setSkipFlash] = useState<{ readonly key: number; readonly message: string } | null>(null);
+
   if (handStart.hand !== view.handNumber) {
     setHandStart({ hand: view.handNumber, levels: levelsOf(view) });
   }
+  if (seenTurn !== view.turn) {
+    setSeenTurn(view.turn);
+    if (view.lastSkipped.length > 0) {
+      const message = view.lastSkipped.includes(myId)
+        ? COPY.youSkipped
+        : COPY.othersSkipped(listNames(view.lastSkipped.map((id) => names[id] ?? id)));
+      setSkipFlash({ key: view.turn, message });
+    }
+  }
 
   useGameSounds(view, myId);
+
+  useEffect(() => {
+    if (!skipFlash) return;
+    playSound('skip');
+    if (skipFlash.message === COPY.youSkipped) buzz([80, 60, 80]);
+    const timer = setTimeout(() => setSkipFlash(null), SKIP_FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [skipFlash]);
 
   useEffect(() => {
     if (toast === null) return;
@@ -74,32 +110,34 @@ export const GameScreen = ({ client, onExit }: Props) => {
   }, [toast]);
 
   const level = me ? getLevel(config, me.level) : undefined;
-  const building = canPlay && me && !me.laidDown && slots !== null ? slots : null;
   const handById = new Map(view.hand.map((c) => [c.id, c]));
-  const inSlots = new Set(building?.flat() ?? []);
+  const activeBuild = canPlay && me && !me.laidDown ? building : null;
+  const inSlots = new Set(activeBuild?.slots.flat() ?? []);
   const handCards = sortCards(
     view.hand.filter((c) => !inSlots.has(c.id)),
     sortMode,
   );
-  const selected = new Set(selectedIds.filter((id) => handById.has(id) && !inSlots.has(id)));
-  const selectedCards = [...selected].map((id) => handById.get(id)).filter(isCard);
+  const selected = selectedId && handById.has(selectedId) && !activeBuild ? handById.get(selectedId) : undefined;
 
-  const builderSlots: BuilderSlot[] | null =
-    building && level
-      ? level.requirements.map((requirement, i) => {
-          const cards = (building[i] ?? []).map((id) => handById.get(id)).filter(isCard);
-          const options = requirement.type === 'run' ? arrangeRun(cards, config) : [];
-          const ordered = options[(shifts[i] ?? 0) % Math.max(1, options.length)] ?? cards;
-          return {
-            requirement,
-            cards: ordered,
-            result: validateGroup(requirement, ordered, config),
-            canShift: options.length > 1,
-          };
-        })
-      : null;
+  // The game checks the hand for you: the Lay down button only shows when it will work.
+  const solution =
+    canPlay && me && !me.laidDown && level ? findLevel(view.hand, level, config) : null;
 
-  const hitCard = canPlay && me?.laidDown && selectedCards.length === 1 ? selectedCards[0] : undefined;
+  const slotsFor = (build: Building): BuilderSlot[] =>
+    (level?.requirements ?? []).map((requirement, i) => {
+      const cards = (build.slots[i] ?? []).map((id) => handById.get(id)).filter(isCard);
+      const options = requirement.type === 'run' ? arrangeRun(cards, config) : [];
+      const ordered = options[(build.shifts[i] ?? 0) % Math.max(1, options.length)] ?? cards;
+      return {
+        requirement,
+        cards: ordered,
+        result: validateGroup(requirement, ordered, config),
+        canShift: options.length > 1,
+      };
+    });
+  const builderSlots = activeBuild ? slotsFor(activeBuild) : null;
+
+  const hitCard = canPlay && me?.laidDown ? selected : undefined;
   const hittable = new Set(
     hitCard
       ? view.table
@@ -110,10 +148,8 @@ export const GameScreen = ({ client, onExit }: Props) => {
   );
   const skipTargets = view.players.filter((p) => p.id !== myId && !p.skipPending);
 
-  const [drawing, setDrawing] = useState(false);
-
   const send = async (move: Move): Promise<boolean> => {
-    setSelectedIds([]);
+    setSelectedId(null);
     const error = await client.send(move);
     if (error) {
       setToast(sendErrorMessage(error));
@@ -131,43 +167,55 @@ export const GameScreen = ({ client, onExit }: Props) => {
     void send({ type: 'draw', source }).finally(() => setDrawing(false));
   };
 
-  const toggle = (id: string) => {
+  const nextOpenBox = (build: Building, from: number): number => {
+    const slots = slotsFor(build);
+    for (let k = 0; k < slots.length; k++) {
+      const i = (from + k) % slots.length;
+      if (!slots[i]?.result.ok) return i;
+    }
+    return from;
+  };
+
+  const tapHandCard = (id: string) => {
     playSound('select');
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    if (activeBuild) {
+      // While laying down, a tapped card goes straight into the active box.
+      const slots = activeBuild.slots.map((ids, i) => (i === activeBuild.active ? [...ids, id] : ids));
+      const next = { ...activeBuild, slots };
+      const filled = slotsFor(next)[activeBuild.active]?.result.ok;
+      setBuilding({ ...next, active: filled ? nextOpenBox(next, activeBuild.active) : activeBuild.active });
+      return;
+    }
+    // Otherwise only one card is picked at a time, so Discard always knows which one.
+    setSelectedId((current) => (current === id ? null : id));
   };
 
   const startBuilding = () => {
     if (!level) return;
-    setSlots(level.requirements.map(() => []));
-    setShifts(level.requirements.map(() => 0));
+    const slots = solution
+      ? solution.map((group) => group.map((c) => c.id))
+      : level.requirements.map(() => []);
+    const build = { slots, active: 0, shifts: level.requirements.map(() => 0) };
+    setSelectedId(null);
+    setBuilding({ ...build, active: nextOpenBox(build, 0) });
   };
 
-  const addToSlot = (index: number) => {
-    setSlots((prev) => prev?.map((ids, i) => (i === index ? [...ids, ...selected] : ids)) ?? null);
-    setSelectedIds([]);
-  };
-
-  const removeFromSlot = (cardId: string) =>
-    setSlots((prev) => prev?.map((ids) => ids.filter((id) => id !== cardId)) ?? null);
-
-  const shiftWilds = (index: number) =>
-    setShifts((prev) => prev.map((n, i) => (i === index ? n + 1 : n)));
+  const removeFromBox = (cardId: string) =>
+    setBuilding((b) => (b ? { ...b, slots: b.slots.map((ids) => ids.filter((id) => id !== cardId)) } : b));
 
   const confirmLayDown = () => {
     if (!builderSlots) return;
     const groups = builderSlots.map((s) => s.cards.map((c) => c.id));
-    // The builder already checked the level, so close it now; a refusal shows a message.
-    setSlots(null);
+    setBuilding(null);
     void send({ type: 'lay-down', groups });
   };
 
   const discard = () => {
-    const card = selectedCards[0];
-    if (!card || selectedCards.length !== 1) return;
+    if (!selected) return;
     const needsTarget =
-      card.kind === 'skip' && config.skipLosesTurn && view.hand.length > 1 && skipTargets.length > 0;
-    if (needsTarget) setPending({ kind: 'skip', cardId: card.id });
-    else void send({ type: 'discard', cardId: card.id });
+      selected.kind === 'skip' && config.skipLosesTurn && view.hand.length > 1 && skipTargets.length > 0;
+    if (needsTarget) setPending({ kind: 'skip', cardId: selected.id });
+    else void send({ type: 'discard', cardId: selected.id });
   };
 
   const hitGroup = (groupId: string) => {
@@ -206,15 +254,15 @@ export const GameScreen = ({ client, onExit }: Props) => {
         : [];
 
   const current = view.players[view.currentIndex];
-  const hint = !isMyTurn
-    ? COPY.waiting(names[current?.id ?? ''] ?? '')
-    : canDraw
-      ? view.discardTop?.kind === 'skip'
-        ? COPY.drawHintSkipOnTop
-        : COPY.drawHint
-      : me?.laidDown
-        ? COPY.playHintLaidDown
-        : COPY.playHint;
+  const hint = (() => {
+    if (!isMyTurn) return COPY.waiting(names[current?.id ?? ''] ?? '');
+    if (canDraw) return view.discardTop?.kind === 'skip' ? COPY.drawHintSkipOnTop : COPY.drawHint;
+    if (activeBuild) return COPY.buildHint;
+    if (hitCard && hittable.size > 0) return COPY.playHintHit;
+    if (selected) return COPY.playHintSelected;
+    if (solution) return COPY.playHintCanLayDown;
+    return me?.laidDown ? COPY.playHintLaidDown : COPY.playHint;
+  })();
 
   const toggleMute = () => {
     setMuted(!muted);
@@ -250,15 +298,17 @@ export const GameScreen = ({ client, onExit }: Props) => {
       />
 
       <main className="middle">
-        {builderSlots ? (
+        {builderSlots && activeBuild ? (
           <LayDownBuilder
             slots={builderSlots}
-            hasSelection={selected.size > 0}
-            onAdd={addToSlot}
-            onRemove={removeFromSlot}
-            onShift={shiftWilds}
+            active={activeBuild.active}
+            onActivate={(i) => setBuilding((b) => (b ? { ...b, active: i } : b))}
+            onRemove={removeFromBox}
+            onShift={(i) =>
+              setBuilding((b) => (b ? { ...b, shifts: b.shifts.map((n, j) => (j === i ? n + 1 : n)) } : b))
+            }
             onConfirm={confirmLayDown}
-            onCancel={() => setSlots(null)}
+            onCancel={() => setBuilding(null)}
           />
         ) : (
           <TableArea groups={view.table} names={names} hittable={hittable} onHit={hitGroup} />
@@ -283,16 +333,16 @@ export const GameScreen = ({ client, onExit }: Props) => {
           >
             {sortMode === 'color' ? COPY.sortByColor : COPY.sortByNumber}
           </button>
-          {canPlay && me && !me.laidDown && !building && (
-            <button type="button" className="btn btn--small" onClick={startBuilding}>
+          {solution && !activeBuild && (
+            <button type="button" className="btn btn--small btn--go" onClick={startBuilding}>
               {COPY.layDown}
             </button>
           )}
-          {canPlay && !building && (
+          {canPlay && !activeBuild && (
             <button
               type="button"
               className="btn btn--small btn--primary"
-              disabled={selectedCards.length !== 1}
+              disabled={!selected}
               onClick={discard}
             >
               {COPY.discard}
@@ -302,9 +352,9 @@ export const GameScreen = ({ client, onExit }: Props) => {
         <Hand
           key={view.handNumber}
           cards={handCards}
-          selected={selected}
-          onToggle={toggle}
-          dealing={!building && view.hand.length <= config.handSize}
+          selected={new Set(selected ? [selected.id] : [])}
+          onToggle={tapHandCard}
+          dealing={!activeBuild && view.hand.length <= config.handSize}
         />
       </section>
 
@@ -313,6 +363,8 @@ export const GameScreen = ({ client, onExit }: Props) => {
           {toast}
         </div>
       )}
+
+      {skipFlash && <SkipFlash key={skipFlash.key} message={skipFlash.message} />}
 
       {pending && (
         <Sheet

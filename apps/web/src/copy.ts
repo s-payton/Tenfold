@@ -13,19 +13,22 @@ export const COPY = {
   you: 'You',
   start: 'Deal me in',
   opponentsLabel: 'Opponents',
-  drawHint: 'Your turn. Draw from the deck or take the top discard.',
-  drawHintSkipOnTop: 'Your turn. Draw from the deck. Skips cannot be picked up.',
-  playHint: 'Lay down, hit, or pick a card to discard.',
-  playHintLaidDown: 'Hit on any group, or pick a card to discard.',
+  drawHint: 'Your turn! Tap the deck or the discard pile to pick up a card.',
+  drawHintSkipOnTop: 'Your turn! Tap the deck to pick up a card. Skips can\'t be picked up.',
+  playHint: 'Tap one card, then press Discard to end your turn.',
+  playHintCanLayDown: 'You have your level! Tap Lay down.',
+  playHintSelected: 'Press Discard to throw this card away and end your turn.',
+  playHintHit: 'Tap a glowing group to add this card to it, or press Discard.',
+  buildHint: 'Tap a box, then tap cards in your hand to put them in it. Tap a card in a box to take it out.',
+  playHintLaidDown: 'Tap a card to add it to a group on the table, or to discard it.',
   waiting: (name: string) => `${name} is playing...`,
   deck: 'Deck',
   discardPile: 'Discard',
-  layDown: 'Lay down level',
+  layDown: 'Lay down',
   layDownConfirm: 'Lay it down',
   cancel: 'Cancel',
   discard: 'Discard',
-  addToGroup: 'Add selected',
-  shiftWilds: 'Move wilds',
+  shiftWilds: 'Move wild',
   sortByNumber: 'Sort: number',
   sortByColor: 'Sort: color',
   hitLow: 'Low end',
@@ -44,7 +47,15 @@ export const COPY = {
   wins: (name: string) => `${name} wins!`,
   playAgain: 'Play again',
   home: 'Home',
-  emptyTable: 'Laid-down groups show up here.',
+  emptyTable: 'Cards that players lay down will show up here.',
+  glossary: [
+    ['Set', 'cards with the same number, like 7 7 7'],
+    ['Run', 'numbers in a row, like 3 4 5 6'],
+    ['Wild', 'counts as any number or color'],
+    ['Skip', 'makes another player miss a turn'],
+  ],
+  youSkipped: "You're skipped!",
+  othersSkipped: (names: string) => `${names} ${names.includes(' and ') ? 'are' : 'is'} skipped!`,
   modeComputer: 'Play vs computer',
   modeFriends: 'Play with friends',
   yourName: 'Your name',
@@ -74,6 +85,9 @@ export const COPY = {
   reload: 'Reload',
 } as const;
 
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** "Set of 3", "Run of 4", "7 cards of one color". */
 export const describeRequirement = (r: GroupRequirement): string => {
   switch (r.type) {
     case 'set':
@@ -81,12 +95,38 @@ export const describeRequirement = (r: GroupRequirement): string => {
     case 'run':
       return `Run of ${String(r.size)}`;
     case 'color':
-      return `${String(r.size)} of one color`;
+      return `${String(r.size)} cards of one color`;
   }
 };
 
-export const describeLevel = (requirements: readonly GroupRequirement[]): string =>
-  requirements.map(describeRequirement).join(' + ');
+/** A plain-words reminder of what a group needs. */
+export const explainRequirement = (r: GroupRequirement): string => {
+  switch (r.type) {
+    case 'set':
+      return `${String(r.size)} cards with the same number`;
+    case 'run': {
+      const example = Array.from({ length: Math.min(r.size, 5) }, (_, i) => String(3 + i)).join(' ');
+      return `${String(r.size)} numbers in a row, like ${example}${r.size > 5 ? '...' : ''}`;
+    }
+    case 'color':
+      return `${String(r.size)} cards that are all the same color`;
+  }
+};
+
+/** "2 sets of 3", "Set of 3, run of 4", "Run of 7". */
+export const describeLevel = (requirements: readonly GroupRequirement[]): string => {
+  const parts: string[] = [];
+  for (let i = 0; i < requirements.length; ) {
+    const r = requirements[i];
+    if (!r) break;
+    let count = 1;
+    while (requirements[i + count]?.type === r.type && requirements[i + count]?.size === r.size) count++;
+    const text = describeRequirement(r).toLowerCase();
+    parts.push(count > 1 ? `${String(count)} ${text.replace(/^(set|run) /, '$1s ')}` : text);
+    i += count;
+  }
+  return capitalize(parts.join(', '));
+};
 
 const GROUP_ERRORS: Record<HitError, string> = {
   'too-small': 'Not enough cards in that group yet.',

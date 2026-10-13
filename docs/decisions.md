@@ -76,3 +76,11 @@ Measured before: about 500 to 600 ms per move at the function, plus a follow-up 
 - **Moves are sent one at a time, in order**, so a quick lay-down then hit cannot arrive reversed.
 - **A reply wins over a Realtime echo at the same version.** While a move is in flight, Realtime messages are ignored, because the echo of our own move would pair the new public data with the old hand.
 - **Measured after:** discard and other predicted moves show in about 30 ms. A draw shows in about 0.5 s (the server round trip: function start, token check, one load and one save). Moving the function's database access to a direct Postgres connection could save roughly another 0.1 s if needed.
+
+## 2026-10-13: Easier play on phones
+
+- **Felt table theme** from CSS variables (`--table-bg` and friends). Host-chosen backgrounds later only need another set of these values behind a `data-table` attribute.
+- **One card selected at a time** outside of laying down, so Discard and hits always know which card. Laying down uses its own boxes instead of a multi-select.
+- **Lay down is offered only when it will work.** `findLevel` checks the hand on every play step; the glowing Lay down button opens side-by-side boxes already filled with the best fit (fewest wilds, then most points). Players can tap a box and then hand cards to change it, or tap a card in a box to take it out.
+- **Plain words everywhere:** "2 sets of 3", "Set of 3, run of 4", with each box explaining what it needs ("3 cards with the same number"), and a short glossary on the home screen.
+- **Skips are announced** with an animated no-entry sign. The engine records `lastSkipped` and a game-wide `turn` counter on every turn change, so every screen can tell exactly when someone lost a turn, including the 2-player case where the skip is set and used up in the same move.
