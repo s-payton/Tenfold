@@ -1,4 +1,4 @@
-name: CI
+name: CI and deploy
 
 on:
   push:
@@ -20,4 +20,36 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
-  # Deploy jobs (GitHub Pages, Supabase) get added once apps/web and supabase/ exist.
+
+  build:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+  # Supabase migrations and Edge Functions deploy get added with the multiplayer work.

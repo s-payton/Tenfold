@@ -33,3 +33,14 @@ Short log of architecture choices. Newest at the bottom.
 - **Setup mistakes throw** (`createGame` with a bad player list), because they are programmer errors. Illegal moves return error codes, because they are player input.
 - **Hand flow:** `createGame` deals hand 1. When a hand ends, the status becomes `hand-over` (or `game-over`), and the server calls `startNextHand` to rotate the dealer and deal again.
 - **Not in the engine yet:** the turn timer and auto-play on timeout. They depend on server time, so they come with the multiplayer work, as a pure `autoPlay(state)` helper.
+
+## 2026-10-13: Web app against a local game
+
+- **`GameClient` interface** (`apps/web/src/game/client.ts`) is all the UI talks to: `getView`, `subscribe`, `send(move)`, `nextHand`. The local fake game implements it now, and the Supabase client will implement it next. Screens only ever see a `PublicView`, never `GameState`.
+- **Local opponents use `autoMove`** (the turn-timeout play: draw from the deck, discard the highest card). They never lay down. Real bots come in build step 5.
+- **Shared engine on the client** gives instant feedback (lay-down builder checks, which groups light up for a hit). The engine still makes the final call, the same way the server will.
+- **Card animation** uses Framer Motion `layoutId` keyed by card id, so a card glides from hand to table or discard pile on its own.
+- **Sounds are synthesized** at runtime into WAV data URIs played through Howler, so there are no audio files to license. Audio unlocks on the "Deal me in" tap for iOS.
+- **All UI wording lives in `apps/web/src/copy.ts`**, which says "level" everywhere.
+- **`?seed=<n>`** in the URL replays the same local deal, for testing and bug reports.
+- **Deploy:** pushes to `main` build `apps/web` and publish it to GitHub Pages under `/tenfold/`. The PWA manifest and icons come in build step 6.
