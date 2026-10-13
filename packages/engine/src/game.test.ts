@@ -95,6 +95,13 @@ describe('createGame', () => {
     expect(s.lastSkipped).toEqual(['b']);
   });
 
+  it('does not skip the first player when Skips are turned off', () => {
+    const seed = findSeed((s) => s.discardPile[0]?.kind === 'skip');
+    const s = createGame(ids(4), { ...rules, skipLosesTurn: false }, seed, 0);
+    expect(s.currentIndex).toBe(1);
+    expect(s.lastSkipped).toEqual([]);
+  });
+
   it('is reproducible from the seed', () => {
     expect(createGame(ids(3), rules, 77)).toEqual(createGame(ids(3), rules, 77));
   });

@@ -92,7 +92,7 @@ const dealHand = (setup: HandSetup, config: RulesConfig): GameState => {
     ...p,
     hand: hands[i] ?? [],
     laidDown: false,
-    skipPending: firstDiscard.kind === 'skip' && i === firstIndex,
+    skipPending: config.skipLosesTurn && firstDiscard.kind === 'skip' && i === firstIndex,
   }));
   return advanceTurn({
     ...setup,
