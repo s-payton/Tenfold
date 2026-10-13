@@ -12,11 +12,11 @@ Status key: **Done** = implemented and tested. **Later** = decided, not built ye
 - Color group cards "do not need to be in numerical order", and duplicates are fine. **Done**
 - Skips can never be part of any level, including the color level. **Done**
 - A run longer than required counts ("lays down a run of 9 cards. This qualifies as 1 run of 7"). **Done**
-- Skips can never be taken from the discard pile. **Later**
-- A drawn Skip may be held or discarded later. **Later**
-- Hitting needs your own level laid down first, only on your turn, on your own groups or others'. Hitting is allowed in the same turn you lay down (sheet example). **Done** for card fit, **Later** for turn checks
-- Going out means getting rid of every card "by discarding or hitting", so hitting your last card goes out with no discard. **Later**
-- A player who completes their level advances even if someone else goes out first. **Later**
+- Skips can never be taken from the discard pile. **Done**
+- A drawn Skip may be held or discarded later. **Done**
+- Hitting needs your own level laid down first, only on your turn, on your own groups or others'. Hitting is allowed in the same turn you lay down (sheet example). **Done**
+- Going out means getting rid of every card "by discarding or hitting", so hitting your last card goes out with no discard. Laying down every card also goes out. **Done**
+- A player who completes their level advances even if someone else goes out first. **Done**
 
 ## Ambiguities and how the engine handles them
 
@@ -26,13 +26,17 @@ Status key: **Done** = implemented and tested. **Later** = decided, not built ye
 4. **Wild placement is ambiguous** for groups like 3, 4, 5, Wild (2 to 5 or 3 to 6). The sheet does not say who picks. Engine: the player chooses by ordering the cards. `arrangeRun` lists every legal ordering so the UI can offer a choice or auto-pick. **Done**
 5. **Run bounds.** The sheet never says runs cannot wrap, but numbers only go 1 to 12. Engine: no wrap, and a Wild cannot stand for 0 or 13. **Done**
 6. **Color of a Wild in the color level.** A Wild takes the group's color. Physical Wilds are colored on the printed deck but the sheet says a Wild "may be used as any color", so our Wilds have no color. **Done**
-7. **First discard is a Skip.** The sheet: "the first player's first turn is automatically skipped." **Later**
-8. **First discard is a Wild.** The sheet: it "may be picked up by the first player". It never forbids taking a Wild from the discard pile at other times either, so Wilds are always takeable. **Later**
-9. **Who a Skip targets.** The sheet says the discarder chooses. It also says "Only one Skip card against each player per round may be used", where "a round is once around the table". Decision: no stacking. A player who already has a skip waiting cannot be chosen again until they have lost that turn. **Later**
-10. **Skips with 2 players.** Not covered. Decision: allowed. Skipping the only opponent means the discarder plays again right away. **Later**
-11. **Draw pile runs out.** Not covered. Decision: shuffle the discard pile, except its top card, into a new draw pile. **Later**
-12. **Who wins the game.** House rule, chosen by the owner, which differs from the sheet. The sheet says the first player to complete level 10 wins, with lowest total score breaking ties between players who complete it in the same hand. Decision: the winner is the first player who goes out while on level 10. Since you cannot go out without laying down your level, this means laying level 10 and emptying your hand in the same hand. If you lay level 10 but someone else goes out first, you have not won and you repeat level 10 next hand, like any other level. Only one player can go out per hand, so ties cannot happen and points never decide the winner. They only show as a running score. **Later**
+7. **First discard is a Skip.** The sheet: "the first player's first turn is automatically skipped." **Done**
+8. **First discard is a Wild.** The sheet: it "may be picked up by the first player". It never forbids taking a Wild from the discard pile at other times either, so Wilds are always takeable. **Done**
+9. **Who a Skip targets.** The sheet says the discarder chooses. It also says "Only one Skip card against each player per round may be used", where "a round is once around the table". Decision: no stacking. A player who already has a skip waiting cannot be chosen again until they have lost that turn. **Done**
+10. **Skips with 2 players.** Not covered. Decision: allowed. Skipping the only opponent means the discarder plays again right away. **Done**
+11. **Draw pile runs out.** Not covered. Decision: shuffle the discard pile, except its top card, into a new draw pile. **Done**
+12. **Who wins the game.** House rule, chosen by the owner, which differs from the sheet. The sheet says the first player to complete level 10 wins, with lowest total score breaking ties between players who complete it in the same hand. Decision: the winner is the first player who goes out while on level 10. Since you cannot go out without laying down your level, this means laying level 10 and emptying your hand in the same hand. If you lay level 10 but someone else goes out first, you have not won and you repeat level 10 next hand, like any other level. Only one player can go out per hand, so ties cannot happen and points never decide the winner. They only show as a running score. **Done**
 13. **Full tie.** Not possible under the house rule in note 12, so no tiebreak hand is needed. **Done** (by decision)
 14. **Discarding Wilds.** The sheet allows discarding "any one of your cards". Default `allowWildDiscard: true`. **Done** (config only)
-15. **Dealer and first player.** First player is left of the dealer, and the deal rotates left each hand. **Later**
+15. **Dealer and first player.** First player is left of the dealer, and the deal rotates left each hand. **Done**
 16. **Level 10 definition.** A second rule sheet (a fan-made printable, kept locally and not in the repo) lists level 10 as 1 set of 4 + 1 set of 3. The 2009 printed sheet and CLAUDE.md say 1 set of 5 + 1 set of 3. Decision: set of 5 + set of 3. **Done**
+17. **Going out on a Skip.** The sheet allows going out by discarding, and a Skip is a legal discard. Engine: allowed, and no target is needed because the hand is over. **Done**
+18. **Pending skips at the end of a hand.** Not covered. Engine: they are cleared when the next hand is dealt. **Done**
+19. **No one can be skipped.** If every other player already has a skip pending, a Skip can still be discarded, with no effect. **Done**
+20. **Draw pile and discard pile both run dry.** Not covered, and very rare (it needs most of the deck laid down on the table). Engine: drawing from the deck fails with `draw-pile-empty`, and the player can still take the top discard unless it is a Skip. If it is a Skip, the player is stuck. Proposal for later: end the hand with no winner and no points. **Open**

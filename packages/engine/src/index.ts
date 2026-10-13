@@ -5,3 +5,6 @@ export * from './levels.ts';
 export * from './validation.ts';
 export * from './hitting.ts';
 export * from './scoring.ts';
+export * from './game.ts';
+export * from './moves.ts';
+export * from './view.ts';
