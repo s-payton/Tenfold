@@ -203,8 +203,20 @@ describe('draw', () => {
     expect(discardPile.slice(0, 3)).toContain(drawn);
   });
 
-  it('reports an empty draw pile when there is nothing to reshuffle', () => {
-    const s = rig({ step: 'draw', drawPile: [], discardPile: cards(4) });
+  it('draws the last discard when it is the only card left, even a Skip', () => {
+    const last = skip();
+    const s = ok(
+      play(rig({ step: 'draw', drawPile: [], discardPile: [last] }), 'a', {
+        type: 'draw',
+        source: 'deck',
+      }),
+    );
+    expect(s.players[0]?.hand.at(-1)).toBe(last);
+    expect(s.discardPile).toEqual([]);
+  });
+
+  it('reports an empty draw pile only when both piles are empty', () => {
+    const s = rig({ step: 'draw', drawPile: [], discardPile: [] });
     expect(play(s, 'a', { type: 'draw', source: 'deck' })).toEqual({
       ok: false,
       error: { code: 'draw-pile-empty' },

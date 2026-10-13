@@ -61,14 +61,18 @@ const checkGoneOut = (state: GameState, config: RulesConfig): GameState =>
     ? endHand(state, state.currentIndex, config)
     : state;
 
-/** Refills an empty draw pile from the discard pile, keeping its top card. */
+/**
+ * Refills an empty draw pile from the discard pile. The top discard stays put unless it
+ * is the only card left, so drawing from the deck never gets stuck.
+ */
 const refillDrawPile = (state: GameState): GameState => {
-  if (state.drawPile.length > 0 || state.discardPile.length <= 1) return state;
+  if (state.drawPile.length > 0 || state.discardPile.length === 0) return state;
+  const keep = state.discardPile.length > 1 ? 1 : 0;
   const rng = createRng(state.seed);
   return {
     ...state,
-    drawPile: shuffle(state.discardPile.slice(0, -1), rng),
-    discardPile: state.discardPile.slice(-1),
+    drawPile: shuffle(state.discardPile.slice(0, state.discardPile.length - keep), rng),
+    discardPile: state.discardPile.slice(state.discardPile.length - keep),
     seed: nextSeed(rng),
   };
 };
