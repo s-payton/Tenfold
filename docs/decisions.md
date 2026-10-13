@@ -51,3 +51,14 @@ Short log of architecture choices. Newest at the bottom.
 - **Bot and timeout moves take a `PublicView`**, never `GameState`, matching the `(publicState, hand, config) => Move` rule. A bot cannot see other hands or the deck order even by accident.
 - **`basicMove`** drives the local opponents for now: take a Wild from the discard pile, lay down as soon as possible, hit whenever possible, discard the highest card that is not a Wild. This pulls part of build step 5 forward because the owner is playtesting.
 - **A Skip on top of the discard pile stays tappable** so the player gets told why it cannot be taken, instead of a silent no-op.
+
+## 2026-10-13: Multiplayer backend
+
+- **Anonymous Supabase auth is the player token.** Each device gets an anonymous user, with the session kept in localStorage by supabase-js, so a refresh or locked phone rejoins the same seat. No accounts or emails. Requires "Allow anonymous sign-ins" in the dashboard.
+- **`packages/server`** holds the referee logic (create, join, start, move, next hand) as pure TypeScript behind a small `Store` interface. It is unit tested in Node against an in-memory store. The Edge Function (`supabase/functions/game`) is only a thin adapter: verify the caller, parse the body, call `handle`, map the Store to SQL.
+- **The Edge Function runs the same source as the web app.** `scripts/sync-functions.mjs` copies `packages/engine/src` and `packages/server/src` into `supabase/functions/_shared` (gitignored), and a per-function `deno.json` import map resolves `@tenfold/engine` and `@tenfold/server` to those copies. `npm run functions:check` syncs and runs `deno check`.
+- **Tables:** `rooms` (with the secret full `GameState`) and `room_players` have RLS on and no policies, so only the server can touch them. `room_states` holds the public `RoomData` (lobby info plus `tableView`) and is readable by members of that room through a `security definer` membership check. `hands` is readable only by the row's own user. Clients have no write policies anywhere.
+- **Writes are atomic and versioned.** `commit_room` updates the room only if its version still matches, then rewrites hands, then the public row, in one transaction. The handler retries from a fresh copy on a conflict, so two quick taps cannot both apply.
+- **Clients read, Realtime nudges.** Clients subscribe to `room_states` changes and then re-read the public row and their own hand, retrying until both carry the same version, so the table and hand never disagree.
+- **Untrusted input:** request bodies are parsed into well-formed actions (`parseAction`) before the engine judges legality. Names are trimmed and capped at 16 characters. Room codes are 4 consonants.
+- **Deploy:** on push to main, CI syncs the shared code, runs `supabase db push`, and deploys the function. It skips itself until `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` are set as GitHub Actions secrets.

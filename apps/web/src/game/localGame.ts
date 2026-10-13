@@ -69,11 +69,11 @@ export const createLocalGame = (options: LocalGameOptions): GameClient => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    send: (move: Move): MoveError | null => {
+    send: (move: Move): Promise<MoveError | null> => {
       const result = applyMove(state, HUMAN_ID, move, config);
-      if (!result.ok) return result.error;
+      if (!result.ok) return Promise.resolve(result.error);
       commit(result.state);
-      return null;
+      return Promise.resolve(null);
     },
     nextHand: () => {
       const result = startNextHand(state, config);

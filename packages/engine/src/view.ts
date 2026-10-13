@@ -10,10 +10,8 @@ export interface PublicPlayer {
   readonly skipPending: boolean;
 }
 
-/** What one player is allowed to see. Other hands, the draw pile and the seed stay hidden. */
-export interface PublicView {
-  readonly viewerId: string;
-  readonly hand: readonly Card[];
+/** What everyone at the table may see. Hands, the draw pile and the seed stay hidden. */
+export interface TableView {
   readonly players: readonly PublicPlayer[];
   readonly dealerIndex: number;
   readonly currentIndex: number;
@@ -28,9 +26,13 @@ export interface PublicView {
   readonly winnerId: string | null;
 }
 
-export const publicView = (state: GameState, viewerId: string): PublicView => ({
-  viewerId,
-  hand: state.players.find((p) => p.id === viewerId)?.hand ?? [],
+/** What one player is allowed to see: the shared table plus their own hand. */
+export interface PublicView extends TableView {
+  readonly viewerId: string;
+  readonly hand: readonly Card[];
+}
+
+export const tableView = (state: GameState): TableView => ({
   players: state.players.map((p) => ({
     id: p.id,
     level: p.level,
@@ -50,4 +52,10 @@ export const publicView = (state: GameState, viewerId: string): PublicView => ({
   status: state.status,
   handWinnerId: state.handWinnerId,
   winnerId: state.winnerId,
+});
+
+export const publicView = (state: GameState, viewerId: string): PublicView => ({
+  ...tableView(state),
+  viewerId,
+  hand: state.players.find((p) => p.id === viewerId)?.hand ?? [],
 });

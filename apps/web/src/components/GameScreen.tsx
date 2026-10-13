@@ -11,7 +11,7 @@ import {
   type RulesConfig,
 } from '@tenfold/engine';
 import { playSound, setMuted } from '../audio.ts';
-import { COPY, describeLevel, moveErrorMessage } from '../copy.ts';
+import { COPY, describeLevel, sendErrorMessage } from '../copy.ts';
 import { sortCards, type SortMode } from '../game/cardOrder.ts';
 import type { GameClient } from '../game/client.ts';
 import { useGameSounds } from '../game/useGameSounds.ts';
@@ -110,10 +110,10 @@ export const GameScreen = ({ client, onExit }: Props) => {
   );
   const skipTargets = view.players.filter((p) => p.id !== myId && !p.skipPending);
 
-  const send = (move: Move): boolean => {
-    const error = client.send(move);
+  const send = async (move: Move): Promise<boolean> => {
+    const error = await client.send(move);
     if (error) {
-      setToast(moveErrorMessage(error));
+      setToast(sendErrorMessage(error));
       playSound('error');
       buzz([30, 40, 30]);
       return false;
@@ -146,9 +146,10 @@ export const GameScreen = ({ client, onExit }: Props) => {
 
   const confirmLayDown = () => {
     if (!builderSlots) return;
-    if (send({ type: 'lay-down', groups: builderSlots.map((s) => s.cards.map((c) => c.id)) })) {
-      setSlots(null);
-    }
+    const groups = builderSlots.map((s) => s.cards.map((c) => c.id));
+    void send({ type: 'lay-down', groups }).then((ok) => {
+      if (ok) setSlots(null);
+    });
   };
 
   const discard = () => {
@@ -157,7 +158,7 @@ export const GameScreen = ({ client, onExit }: Props) => {
     const needsTarget =
       card.kind === 'skip' && config.skipLosesTurn && view.hand.length > 1 && skipTargets.length > 0;
     if (needsTarget) setPending({ kind: 'skip', cardId: card.id });
-    else send({ type: 'discard', cardId: card.id });
+    else void send({ type: 'discard', cardId: card.id });
   };
 
   const hitGroup = (groupId: string) => {
@@ -167,13 +168,13 @@ export const GameScreen = ({ client, onExit }: Props) => {
     if (!result.ok && result.error === 'needs-position') {
       setPending({ kind: 'wild-end', cardId: hitCard.id, groupId });
     } else {
-      send({ type: 'hit', groupId, cardId: hitCard.id });
+      void send({ type: 'hit', groupId, cardId: hitCard.id });
     }
   };
 
   const pick = (move: Move) => () => {
     setPending(null);
-    send(move);
+    void send(move);
   };
 
   const sheetOptions: SheetOption[] =
@@ -234,8 +235,8 @@ export const GameScreen = ({ client, onExit }: Props) => {
       <Piles
         view={view}
         canDraw={canDraw}
-        onDrawDeck={() => send({ type: 'draw', source: 'deck' })}
-        onDrawDiscard={() => send({ type: 'draw', source: 'discard' })}
+        onDrawDeck={() => void send({ type: 'draw', source: 'deck' })}
+        onDrawDiscard={() => void send({ type: 'draw', source: 'discard' })}
       />
 
       <main className="middle">

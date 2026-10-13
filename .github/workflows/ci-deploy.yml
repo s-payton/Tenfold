@@ -52,4 +52,36 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
-  # Supabase migrations and Edge Functions deploy get added with the multiplayer work.
+
+  supabase:
+    # Pushes database migrations and the referee Edge Function, so the server always runs
+    # the same engine as the web build. Skips itself until the secrets are set.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: miyplubvsjgqhbkpixqy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secrets
+        id: secrets
+        run: |
+          if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_DB_PASSWORD" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Supabase secrets are not set, skipping backend deploy."
+          fi
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - if: steps.secrets.outputs.ready == 'true'
+        run: node scripts/sync-functions.mjs
+      - if: steps.secrets.outputs.ready == 'true'
+        run: supabase link --project-ref "$PROJECT_REF"
+      - if: steps.secrets.outputs.ready == 'true'
+        run: supabase db push
+      - if: steps.secrets.outputs.ready == 'true'
+        run: supabase functions deploy game --project-ref "$PROJECT_REF" --no-verify-jwt --use-api

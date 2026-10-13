@@ -37,22 +37,22 @@ describe('createLocalGame', () => {
     game.dispose();
   });
 
-  it('applies my legal moves and notifies subscribers', () => {
+  it('applies my legal moves and notifies subscribers', async () => {
     const game = createLocalGame({ opponents: 1, seed: 4, botDelayMs: 10 });
     untilMyTurn(game);
     const listener = vi.fn();
     game.subscribe(listener);
-    expect(game.send({ type: 'draw', source: 'deck' })).toBeNull();
+    expect(await game.send({ type: 'draw', source: 'deck' })).toBeNull();
     expect(listener).toHaveBeenCalled();
     expect(game.getView().hand).toHaveLength(11);
     game.dispose();
   });
 
-  it('returns the reason for an illegal move and changes nothing', () => {
+  it('returns the reason for an illegal move and changes nothing', async () => {
     const game = createLocalGame({ opponents: 1, seed: 5, botDelayMs: 10 });
     untilMyTurn(game);
     const before = game.getView();
-    expect(game.send({ type: 'discard', cardId: 'nope' })).toEqual({ code: 'must-draw-first' });
+    expect(await game.send({ type: 'discard', cardId: 'nope' })).toEqual({ code: 'must-draw-first' });
     expect(game.getView()).toBe(before);
     game.dispose();
   });

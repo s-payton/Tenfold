@@ -1,4 +1,6 @@
 import type { GroupRequirement, HitError, LevelError, MoveError } from '@tenfold/engine';
+import type { SendError } from './game/client.ts';
+import type { ApiError } from './net/api.ts';
 
 /**
  * Every word the player reads lives here, so the game's terms are easy to change.
@@ -43,6 +45,27 @@ export const COPY = {
   playAgain: 'Play again',
   home: 'Home',
   emptyTable: 'Laid-down groups show up here.',
+  modeComputer: 'Play vs computer',
+  modeFriends: 'Play with friends',
+  yourName: 'Your name',
+  createRoom: 'Create a room',
+  haveCode: 'Have a room code?',
+  roomCode: 'Room code',
+  join: 'Join',
+  rejoin: (code: string) => `Rejoin room ${code}`,
+  needName: 'Enter your name first.',
+  working: 'One moment...',
+  invite: 'Invite friends',
+  inviteCopied: 'Invite link copied',
+  inviteText: (code: string) => `Join my Tenfold game! Room code ${code}`,
+  playersCount: (n: number, max: number) => `Players ${String(n)} of ${String(max)}`,
+  host: 'Host',
+  startGame: 'Start game',
+  needMorePlayers: 'Waiting for at least one more player to join.',
+  waitingForHost: (name: string) => `Waiting for ${name} to start the game...`,
+  leave: 'Leave room',
+  connecting: 'Connecting...',
+  rotate: 'Turn your phone upright to play.',
 } as const;
 
 export const describeRequirement = (r: GroupRequirement): string => {
@@ -102,6 +125,26 @@ const MOVE_ERRORS = {
   'skip-target-required': 'Choose who to skip.',
   'invalid-skip-target': 'That player cannot be skipped right now.',
 } as const satisfies Record<Exclude<MoveError['code'], 'level-invalid' | 'hit-invalid'>, string>;
+
+const SERVER_ERRORS: Record<Exclude<ApiError['code'], 'move-rejected'>, string> = {
+  'bad-request': 'Something went wrong. Try again.',
+  'room-not-found': 'No room with that code.',
+  'room-full': 'That room is full.',
+  'game-started': 'That game has already started.',
+  'not-a-member': 'You are not in that room.',
+  'not-host': 'Only the host can start the game.',
+  'not-enough-players': 'You need at least 2 players.',
+  'not-started': 'The game has not started yet.',
+  busy: 'The table is busy. Try again.',
+  offline: 'Could not reach the table. Check your connection.',
+  'no-session': 'Could not connect. Multiplayer may not be switched on yet.',
+};
+
+export const apiErrorMessage = (error: ApiError): string =>
+  error.code === 'move-rejected' ? moveErrorMessage(error.error) : SERVER_ERRORS[error.code];
+
+export const sendErrorMessage = (error: SendError): string =>
+  error.code === 'offline' ? SERVER_ERRORS.offline : moveErrorMessage(error);
 
 export const moveErrorMessage = (error: MoveError): string => {
   switch (error.code) {

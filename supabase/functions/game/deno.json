@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
+    "@tenfold/engine": "../_shared/engine/index.ts",
+    "@tenfold/server": "../_shared/server/index.ts"
+  }
+}

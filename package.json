@@ -12,7 +12,9 @@
     "test": "npm run test --workspaces --if-present",
     "check": "npm run typecheck && npm run lint && npm run test",
     "dev": "npm run dev -w @tenfold/web",
-    "build": "npm run build -w @tenfold/web"
+    "build": "npm run build -w @tenfold/web",
+    "functions:sync": "node scripts/sync-functions.mjs",
+    "functions:check": "node scripts/sync-functions.mjs && cd supabase/functions/game && npx --yes deno check --config deno.json index.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

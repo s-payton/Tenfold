@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { DEFAULT_RULES } from './config.ts';
 import { createGame } from './game.ts';
-import { publicView } from './view.ts';
+import { publicView, tableView } from './view.ts';
 
 const players = ['a', 'b', 'c'];
 
@@ -51,5 +51,14 @@ describe('publicView', () => {
         for (const card of hidden) expect(json).not.toContain(`"${card.id}"`);
       }),
     );
+  });
+
+  it('tableView is the public view without any hand', () => {
+    const view = tableView(state);
+    expect(view).not.toHaveProperty('hand');
+    expect(view).not.toHaveProperty('viewerId');
+    expect(publicView(state, 'a')).toEqual({ ...view, viewerId: 'a', hand: state.players[0]?.hand });
+    const json = JSON.stringify(view);
+    for (const card of state.players.flatMap((p) => p.hand)) expect(json).not.toContain(`"${card.id}"`);
   });
 });
