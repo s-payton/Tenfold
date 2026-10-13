@@ -84,6 +84,24 @@ describe('parseAction', () => {
     ).toEqual({ type: 'move', roomId: 'r1', move: { type: 'draw', source: 'deck' } });
   });
 
+  it('parses the seat and timer actions', () => {
+    for (const type of ['timeout', 'reclaim', 'leave'] as const) {
+      expect(parseAction({ type, roomId: 'r1' })).toEqual({ type, roomId: 'r1' });
+    }
+    expect(parseAction({ type: 'add-bot', roomId: 'r1', level: 'hard' })).toEqual({
+      type: 'add-bot',
+      roomId: 'r1',
+      level: 'hard',
+    });
+    expect(parseAction({ type: 'add-bot', roomId: 'r1', level: 'genius' })).toBeNull();
+    expect(parseAction({ type: 'remove', roomId: 'r1', playerId: 'p2' })).toEqual({
+      type: 'remove',
+      roomId: 'r1',
+      playerId: 'p2',
+    });
+    expect(parseAction({ type: 'remove', roomId: 'r1' })).toBeNull();
+  });
+
   it('rejects bad actions', () => {
     expect(parseAction('create')).toBeNull();
     expect(parseAction({ type: 'create', name: '' })).toBeNull();

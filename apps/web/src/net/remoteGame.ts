@@ -22,14 +22,35 @@ export const createRemoteGame = (
   let shown: PublicView = first;
   const names = Object.fromEntries(initial.data.players.map((p) => [p.id, p.name]));
   names[playerId] = 'You';
+  let roomData = initial.data;
   const listeners = new Set<() => void>();
   const notify = () => {
     for (const listener of listeners) listener();
   };
+
+  // Every phone in the room watches the turn clock. When it runs out, any of them asks the
+  // server to play the turn; the server checks the deadline against its own clock. A small
+  // random delay keeps all phones from asking at the same instant.
+  let clockTimer: ReturnType<typeof setTimeout> | undefined;
+  const askTimeout = () => {
+    void callGame({ type: 'timeout', roomId }).then((result) => {
+      if (result.ok) watch.push(result.snapshot);
+      else if (result.error.code === 'too-early') clockTimer = setTimeout(askTimeout, 1000);
+    });
+  };
+  const watchClock = (deadline: number | null) => {
+    clearTimeout(clockTimer);
+    if (deadline === null) return;
+    const wait = Math.max(0, deadline - Date.now()) + 250 + Math.random() * 750;
+    clockTimer = setTimeout(askTimeout, wait);
+  };
+
   let inFlight = 0;
   const watch = watchRoom(
     roomId,
     (snapshot) => {
+      roomData = snapshot.data;
+      watchClock(snapshot.data.turnDeadline);
       const next = toView(snapshot, playerId);
       if (!next) return;
       confirmed = next;
@@ -85,8 +106,18 @@ export const createRemoteGame = (
       });
     },
     dispose: () => {
+      clearTimeout(clockTimer);
       watch.stop();
       listeners.clear();
+    },
+    getRoomData: () => roomData,
+    reclaim: () => {
+      void callGame({ type: 'reclaim', roomId }).then((result) => {
+        if (result.ok) watch.push(result.snapshot);
+      });
+    },
+    leave: async () => {
+      await callGame({ type: 'leave', roomId });
     },
   };
 };

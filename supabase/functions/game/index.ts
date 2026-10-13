@@ -61,6 +61,7 @@ const store: Store = {
 const deps = {
   random: () => crypto.getRandomValues(new Uint32Array(1))[0] / 0x100000000,
   newId: () => crypto.randomUUID(),
+  now: () => Date.now(),
 };
 
 Deno.serve(async (req) => {

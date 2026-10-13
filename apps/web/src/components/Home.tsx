@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DEFAULT_RULES } from '@tenfold/engine';
+import { BOT_LEVELS, DEFAULT_RULES, type BotLevel } from '@tenfold/engine';
 import { unlockAudio } from '../audio.ts';
 import { COPY, describeLevel } from '../copy.ts';
 import type { SavedRoom } from '../net/savedRoom.ts';
@@ -13,7 +13,7 @@ interface Props {
   readonly savedRoom: SavedRoom | null;
   readonly busy: boolean;
   readonly error: string | null;
-  readonly onLocal: (opponents: number) => void;
+  readonly onLocal: (opponents: number, level: BotLevel) => void;
   readonly onCreate: (name: string) => void;
   readonly onJoin: (name: string, code: string) => void;
 }
@@ -21,6 +21,7 @@ interface Props {
 export const Home = (props: Props) => {
   const [mode, setMode] = useState<Mode>(props.initialCode || props.savedRoom ? 'friends' : 'computer');
   const [opponents, setOpponents] = useState(3);
+  const [level, setLevel] = useState<BotLevel>('medium');
   const [name, setName] = useState(props.initialName);
   const [code, setCode] = useState(props.initialCode);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -81,12 +82,26 @@ export const Home = (props: Props) => {
               </button>
             ))}
           </fieldset>
+          <fieldset className="picker">
+            <legend>{COPY.difficulty}</legend>
+            {BOT_LEVELS.map((l) => (
+              <button
+                key={l}
+                type="button"
+                className={`picker__pill ${l === level ? 'picker__pill--on' : ''}`}
+                aria-pressed={l === level}
+                onClick={() => setLevel(l)}
+              >
+                {COPY.levels[l]}
+              </button>
+            ))}
+          </fieldset>
           <button
             type="button"
             className="btn btn--primary btn--big"
             onClick={() => {
               unlockAudio();
-              props.onLocal(opponents);
+              props.onLocal(opponents, level);
             }}
           >
             {COPY.start}

@@ -1,4 +1,4 @@
-import type { Card, GameState, Move, MoveError, TableView } from '@tenfold/engine';
+import type { BotLevel, Card, GameState, Move, MoveError, TableView } from '@tenfold/engine';
 
 export type RoomStatus = 'lobby' | 'playing' | 'finished';
 
@@ -6,6 +6,13 @@ export interface RoomPlayer {
   readonly id: string;
   readonly name: string;
   readonly seat: number;
+  /**
+   * Set when a computer plays this seat: a computer player the host added, or a bot
+   * standing in for a person who missed 2 turns in a row (they can take it back).
+   */
+  readonly bot: BotLevel | null;
+  /** Turns in a row this person let time out. */
+  readonly missed: number;
 }
 
 /** Everything members of a room may see. Published to the `room_states` table. */
@@ -15,6 +22,8 @@ export interface RoomData {
   readonly hostPlayerId: string;
   readonly players: readonly RoomPlayer[];
   readonly table: TableView | null;
+  /** When the current turn times out, in epoch milliseconds. Null when nobody is on the clock. */
+  readonly turnDeadline: number | null;
 }
 
 /** Links a seat to the anonymous auth user who owns it. */
@@ -46,6 +55,8 @@ export interface Deps {
   /** Uniform random number in [0, 1). */
   readonly random: () => number;
   readonly newId: () => string;
+  /** Current time in epoch milliseconds. */
+  readonly now: () => number;
 }
 
 export type Action =
@@ -53,7 +64,13 @@ export type Action =
   | { readonly type: 'join'; readonly code: string; readonly name: string }
   | { readonly type: 'start'; readonly roomId: string }
   | { readonly type: 'move'; readonly roomId: string; readonly move: Move }
-  | { readonly type: 'next-hand'; readonly roomId: string };
+  | { readonly type: 'next-hand'; readonly roomId: string }
+  /** Anyone in the room may ask; it only acts once the deadline has passed. */
+  | { readonly type: 'timeout'; readonly roomId: string }
+  | { readonly type: 'reclaim'; readonly roomId: string }
+  | { readonly type: 'leave'; readonly roomId: string }
+  | { readonly type: 'add-bot'; readonly roomId: string; readonly level: BotLevel }
+  | { readonly type: 'remove'; readonly roomId: string; readonly playerId: string };
 
 export type ServerError =
   | {
@@ -66,6 +83,8 @@ export type ServerError =
         | 'not-host'
         | 'not-enough-players'
         | 'not-started'
+        | 'not-in-lobby'
+        | 'too-early'
         | 'busy';
     }
   | { readonly code: 'move-rejected'; readonly error: MoveError };

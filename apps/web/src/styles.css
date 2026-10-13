@@ -331,8 +331,8 @@ button.card {
 
 .game {
   height: 100dvh;
-  display: grid;
-  grid-template-rows: auto auto auto 1fr auto;
+  display: flex;
+  flex-direction: column;
   padding-top: env(safe-area-inset-top);
   overflow: hidden;
 }
@@ -462,6 +462,7 @@ button.card {
 }
 
 .middle {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 0 16px 8px;
@@ -1019,4 +1020,92 @@ input:focus {
   to {
     transform: translateY(-4px);
   }
+}
+
+/* Difficulty pills */
+
+.picker__pill {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-line);
+  background: var(--panel);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.picker__pill--on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.addbot {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.addbot__levels {
+  display: flex;
+  gap: 6px;
+}
+
+/* Turn clock */
+
+.clock {
+  position: relative;
+  height: 18px;
+  margin: 0 16px 6px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.3);
+  overflow: hidden;
+}
+
+.clock__bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s linear;
+}
+
+.clock--urgent .clock__bar {
+  background: var(--danger);
+}
+
+.clock__label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--ink);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+}
+
+.chip__bot {
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+}
+
+.seatbanner {
+  margin: 0 16px 6px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgb(0 0 0 / 0.4);
+  border: 1px solid var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.sheet__note {
+  margin: -4px 0 6px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
 }

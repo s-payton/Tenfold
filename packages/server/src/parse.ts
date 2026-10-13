@@ -1,4 +1,4 @@
-import type { Move } from '@tenfold/engine';
+import { BOT_LEVELS, type BotLevel, type Move } from '@tenfold/engine';
 import type { Action } from './types.ts';
 
 export const MAX_NAME_LENGTH = 16;
@@ -89,7 +89,18 @@ export const parseAction = (input: unknown): Action | null => {
     }
     case 'start':
     case 'next-hand':
+    case 'timeout':
+    case 'reclaim':
+    case 'leave':
       return isId(input.roomId) ? { type: input.type, roomId: input.roomId } : null;
+    case 'add-bot': {
+      const level = BOT_LEVELS.find((l): l is BotLevel => l === input.level);
+      return isId(input.roomId) && level ? { type: 'add-bot', roomId: input.roomId, level } : null;
+    }
+    case 'remove':
+      return isId(input.roomId) && isId(input.playerId)
+        ? { type: 'remove', roomId: input.roomId, playerId: input.playerId }
+        : null;
     case 'move': {
       const move = parseMove(input.move);
       return isId(input.roomId) && move ? { type: 'move', roomId: input.roomId, move } : null;

@@ -1,16 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RULES, basicMove, createRng, getLevel, publicView } from '@tenfold/engine';
 import { createMemoryStore } from './memory-store.ts';
-import { handle, handsOf } from './rooms.ts';
+import { BOT_TURN_MS, TURN_MS, handle, handsOf } from './rooms.ts';
 import type { ActionResult, Deps, StoredRoom } from './types.ts';
 
 const setup = (seed = 1) => {
   const memory = createMemoryStore();
   let next = 0;
-  const deps: Deps = { random: createRng(seed), newId: () => `id-${String(next++)}` };
+  let clock = 1_000_000;
+  const deps: Deps = { random: createRng(seed), newId: () => `id-${String(next++)}`, now: () => clock };
   const act = (userId: string, action: Parameters<typeof handle>[3]) =>
     handle(memory.store, deps, userId, action);
-  return { ...memory, act };
+  return {
+    ...memory,
+    act,
+    now: () => clock,
+    advance: (ms: number) => {
+      clock += ms;
+    },
+  };
 };
 
 const okResult = (result: ActionResult) => {
@@ -44,8 +52,9 @@ describe('create', () => {
       code: result.code,
       status: 'lobby',
       hostPlayerId: result.playerId,
-      players: [{ id: result.playerId, name: 'Sam', seat: 0 }],
+      players: [{ id: result.playerId, name: 'Sam', seat: 0, bot: null, missed: 0 }],
       table: null,
+      turnDeadline: null,
     });
     expect(room.members).toEqual([{ playerId: result.playerId, userId: 'u0' }]);
   });
@@ -229,5 +238,158 @@ describe('move', () => {
       expect(roomOf(t.rooms, t.roomId).data.table?.handNumber).toBe(hand + 1);
       expect(getLevel(DEFAULT_RULES, 1)).toBeDefined();
     }
+  });
+});
+
+/** The user whose turn it is in a started room. */
+const currentUser = (rooms: Map<string, StoredRoom>, roomId: string) => {
+  const room = roomOf(rooms, roomId);
+  const id = room.game?.players[room.game.currentIndex]?.id;
+  return { playerId: id ?? '', userId: room.members.find((m) => m.playerId === id)?.userId ?? '' };
+};
+
+describe('turn timer', () => {
+  it('starts a 30 second clock for the first player and resets it on every move', async () => {
+    const t = await lobby(2);
+    okResult(await t.act('u0', { type: 'start', roomId: t.roomId }));
+    expect(roomOf(t.rooms, t.roomId).data.turnDeadline).toBe(t.now() + TURN_MS);
+    t.advance(10_000);
+    const { userId } = currentUser(t.rooms, t.roomId);
+    okResult(await t.act(userId, { type: 'move', roomId: t.roomId, move: { type: 'draw', source: 'deck' } }));
+    expect(roomOf(t.rooms, t.roomId).data.turnDeadline).toBe(t.now() + TURN_MS);
+  });
+
+  it('refuses a timeout before the deadline', async () => {
+    const t = await lobby(2);
+    okResult(await t.act('u0', { type: 'start', roomId: t.roomId }));
+    t.advance(TURN_MS - 1);
+    expect(await t.act('u1', { type: 'timeout', roomId: t.roomId })).toEqual({
+      ok: false,
+      error: { code: 'too-early' },
+    });
+  });
+
+  it('auto-plays a missed turn, and a bot takes the seat after 2 misses in a row', async () => {
+    const t = await lobby(2);
+    okResult(await t.act('u0', { type: 'start', roomId: t.roomId }));
+    const sleeper = currentUser(t.rooms, t.roomId);
+    const awake = sleeper.userId === 'u0' ? 'u1' : 'u0';
+    const seat = () => roomOf(t.rooms, t.roomId).data.players.find((p) => p.id === sleeper.playerId);
+
+    t.advance(TURN_MS);
+    okResult(await t.act(awake, { type: 'timeout', roomId: t.roomId }));
+    expect(seat()).toMatchObject({ missed: 1, bot: null });
+    expect(currentUser(t.rooms, t.roomId).playerId).not.toBe(sleeper.playerId);
+
+    // The awake player takes a normal turn.
+    for (const move of [{ type: 'draw', source: 'deck' }] as const) {
+      okResult(await t.act(awake, { type: 'move', roomId: t.roomId, move }));
+    }
+    const room = roomOf(t.rooms, t.roomId);
+    const card = room.game?.players.find((p) => p.id !== sleeper.playerId)?.hand.find((c) => c.kind === 'number');
+    okResult(await t.act(awake, { type: 'move', roomId: t.roomId, move: { type: 'discard', cardId: card?.id ?? '' } }));
+
+    t.advance(TURN_MS);
+    okResult(await t.act(awake, { type: 'timeout', roomId: t.roomId }));
+    expect(seat()).toMatchObject({ missed: 2, bot: 'medium' });
+  });
+
+  it('a move clears the misses, and reclaim takes the seat back from the bot', async () => {
+    const t = await lobby(2);
+    okResult(await t.act('u0', { type: 'start', roomId: t.roomId }));
+    const sleeper = currentUser(t.rooms, t.roomId);
+    t.advance(TURN_MS);
+    const other = sleeper.userId === 'u0' ? 'u1' : 'u0';
+    okResult(await t.act(other, { type: 'timeout', roomId: t.roomId }));
+    okResult(await t.act(sleeper.userId, { type: 'leave', roomId: t.roomId }));
+    const seat = () => roomOf(t.rooms, t.roomId).data.players.find((p) => p.id === sleeper.playerId);
+    expect(seat()?.bot).toBe('medium');
+    okResult(await t.act(sleeper.userId, { type: 'reclaim', roomId: t.roomId }));
+    expect(seat()).toMatchObject({ bot: null, missed: 0 });
+  });
+
+  it('gives computer seats a short clock and plays their whole turn on timeout', async () => {
+    const t = setup();
+    const host = okResult(await t.act('u0', { type: 'create', name: 'Host' }));
+    okResult(await t.act('u0', { type: 'add-bot', roomId: host.roomId, level: 'hard' }));
+    okResult(await t.act('u0', { type: 'start', roomId: host.roomId }));
+    // Play until the bot is up, then let it move.
+    for (let i = 0; i < 4; i++) {
+      const room = roomOf(t.rooms, host.roomId);
+      const current = room.data.players.find((p) => p.id === room.game?.players[room.game.currentIndex]?.id);
+      if (current?.bot) break;
+      t.advance(TURN_MS);
+      okResult(await t.act('u0', { type: 'timeout', roomId: host.roomId }));
+    }
+    const before = roomOf(t.rooms, host.roomId);
+    expect(before.data.turnDeadline).toBe(t.now() + BOT_TURN_MS);
+    t.advance(BOT_TURN_MS);
+    okResult(await t.act('u0', { type: 'timeout', roomId: host.roomId }));
+    const after = roomOf(t.rooms, host.roomId);
+    expect(after.game?.turn).toBeGreaterThan(before.game?.turn ?? 0);
+    expect(after.data.players.find((p) => p.bot)?.missed).toBe(0);
+  });
+});
+
+describe('lobby controls', () => {
+  it('the host adds computer players with a level, named and seated in order', async () => {
+    const t = await lobby(2);
+    okResult(await t.act('u0', { type: 'add-bot', roomId: t.roomId, level: 'easy' }));
+    const players = roomOf(t.rooms, t.roomId).data.players;
+    expect(players.map((p) => [p.seat, p.bot])).toEqual([
+      [0, null],
+      [1, null],
+      [2, 'easy'],
+    ]);
+    expect(await t.act('u1', { type: 'add-bot', roomId: t.roomId, level: 'easy' })).toEqual({
+      ok: false,
+      error: { code: 'not-host' },
+    });
+  });
+
+  it('a game can start with the host and computer players only', async () => {
+    const t = setup();
+    const host = okResult(await t.act('u0', { type: 'create', name: 'Host' }));
+    okResult(await t.act('u0', { type: 'add-bot', roomId: host.roomId, level: 'medium' }));
+    okResult(await t.act('u0', { type: 'start', roomId: host.roomId }));
+    const room = roomOf(t.rooms, host.roomId);
+    expect(room.game?.players).toHaveLength(2);
+    expect(handsOf(room).map((h) => h.userId)).toEqual(['u0']);
+  });
+
+  it('the host removes a player, who loses their seat and membership', async () => {
+    const t = await lobby(3);
+    const target = roomOf(t.rooms, t.roomId).data.players[1]?.id ?? '';
+    okResult(await t.act('u0', { type: 'remove', roomId: t.roomId, playerId: target }));
+    const room = roomOf(t.rooms, t.roomId);
+    expect(room.data.players.map((p) => [p.name, p.seat])).toEqual([
+      ['Host', 0],
+      ['P2', 1],
+    ]);
+    expect(room.members.map((m) => m.userId)).toEqual(['u0', 'u2']);
+    expect(await t.act('u2', { type: 'remove', roomId: t.roomId, playerId: room.data.players[0]?.id ?? '' })).toEqual({
+      ok: false,
+      error: { code: 'not-host' },
+    });
+  });
+
+  it('leaving the lobby frees the seat, passes the host on, and closes an empty room', async () => {
+    const t = await lobby(2);
+    okResult(await t.act('u0', { type: 'leave', roomId: t.roomId }));
+    let room = roomOf(t.rooms, t.roomId);
+    expect(room.data.players.map((p) => p.name)).toEqual(['P1']);
+    expect(room.data.hostPlayerId).toBe(room.data.players[0]?.id);
+    okResult(await t.act('u1', { type: 'leave', roomId: t.roomId }));
+    room = roomOf(t.rooms, t.roomId);
+    expect(room.data.status).toBe('finished');
+  });
+
+  it('nothing in the lobby can change once the game starts', async () => {
+    const t = await lobby(2);
+    okResult(await t.act('u0', { type: 'start', roomId: t.roomId }));
+    expect(await t.act('u0', { type: 'add-bot', roomId: t.roomId, level: 'easy' })).toEqual({
+      ok: false,
+      error: { code: 'not-in-lobby' },
+    });
   });
 });

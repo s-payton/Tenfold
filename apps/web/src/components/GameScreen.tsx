@@ -17,6 +17,7 @@ import { sortCards, type SortMode } from '../game/cardOrder.ts';
 import type { GameClient } from '../game/client.ts';
 import { useGameSounds } from '../game/useGameSounds.ts';
 import { useGameView } from '../game/useGameView.ts';
+import { useRoomData } from '../game/useRoomData.ts';
 import { buzz } from '../haptics.ts';
 import { Hand } from './Hand.tsx';
 import { HandOver } from './HandOver.tsx';
@@ -26,6 +27,7 @@ import { Piles } from './Piles.tsx';
 import { Sheet, type SheetOption } from './Sheet.tsx';
 import { SkipFlash } from './SkipFlash.tsx';
 import { TableArea } from './TableArea.tsx';
+import { TurnClock } from './TurnClock.tsx';
 
 type Pending =
   | { readonly kind: 'skip'; readonly cardId: string }
@@ -46,6 +48,8 @@ interface Props {
 }
 
 const SKIP_FLASH_MS = 1900;
+/** Matches the server's turn length; only used to size the clock bar. */
+const TURN_MS = 30_000;
 
 const isCard = (c: CardData | undefined): c is CardData => c !== undefined;
 
@@ -62,6 +66,7 @@ const listNames = (names: readonly string[]): string =>
 
 export const GameScreen = ({ client, onExit }: Props) => {
   const view = useGameView(client);
+  const room = useRoomData(client);
   const { config, names, myId } = client;
   const myIndex = view.players.findIndex((p) => p.id === myId);
   const me = view.players[myIndex];
@@ -76,6 +81,7 @@ export const GameScreen = ({ client, onExit }: Props) => {
   const [toast, setToast] = useState<string | null>(null);
   const [muted, setMutedState] = useState(false);
   const [drawing, setDrawing] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const [handStart, setHandStart] = useState({ hand: view.handNumber, levels: levelsOf(view) });
   const [seenTurn, setSeenTurn] = useState(view.turn);
   const [skipFlash, setSkipFlash] = useState<{ readonly key: number; readonly message: string } | null>(null);
@@ -264,6 +270,15 @@ export const GameScreen = ({ client, onExit }: Props) => {
     return me?.laidDown ? COPY.playHintLaidDown : COPY.playHint;
   })();
 
+  const mySeat = room?.players.find((p) => p.id === myId);
+  const currentSeat = room?.players.find((p) => p.id === current?.id);
+  const clockTotal = currentSeat?.bot ? 1200 : TURN_MS;
+
+  const exit = () => {
+    if (client.leave && view.status === 'playing') setConfirmLeave(true);
+    else onExit();
+  };
+
   const toggleMute = () => {
     setMuted(!muted);
     setMutedState(!muted);
@@ -272,7 +287,7 @@ export const GameScreen = ({ client, onExit }: Props) => {
   return (
     <div className="game">
       <header className="topbar">
-        <button type="button" className="btn btn--small btn--ghost" onClick={onExit}>
+        <button type="button" className="btn btn--small btn--ghost" onClick={exit}>
           {COPY.home}
         </button>
         <span className="topbar__title">{COPY.appName}</span>
@@ -287,7 +302,20 @@ export const GameScreen = ({ client, onExit }: Props) => {
         </button>
       </header>
 
-      <Opponents view={view} names={names} />
+      <Opponents view={view} names={names} {...(room ? { seats: room.players } : {})} />
+
+      {room && !currentSeat?.bot && (
+        <TurnClock deadline={room.turnDeadline} totalMs={clockTotal} mine={isMyTurn} />
+      )}
+
+      {mySeat?.bot && client.reclaim && (
+        <div className="seatbanner" role="alert">
+          <span>{COPY.botPlayingForYou}</span>
+          <button type="button" className="btn btn--small btn--primary" onClick={client.reclaim}>
+            {COPY.imBack}
+          </button>
+        </div>
+      )}
 
       <Piles
         view={view}
@@ -371,6 +399,24 @@ export const GameScreen = ({ client, onExit }: Props) => {
           title={pending.kind === 'skip' ? COPY.skipWho : COPY.whereWild}
           options={sheetOptions}
           onClose={() => setPending(null)}
+        />
+      )}
+
+      {confirmLeave && (
+        <Sheet
+          title={COPY.leaveGameTitle}
+          options={[
+            {
+              label: COPY.leaveGame,
+              onPick: () => {
+                setConfirmLeave(false);
+                void client.leave?.().finally(onExit);
+              },
+            },
+          ]}
+          onClose={() => setConfirmLeave(false)}
+          note={COPY.leaveGameBody}
+          cancelLabel={COPY.stay}
         />
       )}
 

@@ -10,10 +10,13 @@ interface Props {
   readonly title: string;
   readonly options: readonly SheetOption[];
   readonly onClose: () => void;
+  /** Optional explanation under the title. */
+  readonly note?: string;
+  readonly cancelLabel?: string;
 }
 
 /** A bottom sheet with a short list of choices. */
-export const Sheet = ({ title, options, onClose }: Props) => (
+export const Sheet = ({ title, options, onClose, note, cancelLabel }: Props) => (
   <div className="overlay" role="dialog" aria-modal="true" aria-label={title}>
     <motion.div
       className="sheet"
@@ -22,13 +25,14 @@ export const Sheet = ({ title, options, onClose }: Props) => (
       transition={{ type: 'spring', stiffness: 380, damping: 34 }}
     >
       <h2 className="sheet__title">{title}</h2>
+      {note && <p className="sheet__note">{note}</p>}
       {options.map((o) => (
         <button key={o.label} type="button" className="btn btn--primary" onClick={o.onPick}>
           {o.label}
         </button>
       ))}
       <button type="button" className="btn btn--ghost" onClick={onClose}>
-        {COPY.cancel}
+        {cancelLabel ?? COPY.cancel}
       </button>
     </motion.div>
   </div>

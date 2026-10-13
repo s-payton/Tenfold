@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MAX_PLAYERS, MIN_PLAYERS } from '@tenfold/engine';
+import { BOT_LEVELS, MAX_PLAYERS, MIN_PLAYERS, type BotLevel } from '@tenfold/engine';
 import { COPY, apiErrorMessage } from '../copy.ts';
 import { callGame } from '../net/api.ts';
 import { watchRoom, type RoomSnapshot } from '../net/room.ts';
@@ -22,6 +22,7 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
   const [starting, setStarting] = useState(false);
   const handedOff = useRef(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [botLevel, setBotLevel] = useState<BotLevel>('medium');
 
   useEffect(() => {
     const watch = watchRoom(roomId, (next) => {
@@ -73,6 +74,13 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
     setSnapshot(result.snapshot);
   };
 
+  const act = async (action: Parameters<typeof callGame>[0]) => {
+    setError(null);
+    const result = await callGame(action);
+    if (result.ok) setSnapshot(result.snapshot);
+    else setError(apiErrorMessage(result.error));
+  };
+
   const start = async () => {
     setStarting(true);
     setError(null);
@@ -111,6 +119,17 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
               <span>{p.name}</span>
               {p.id === playerId && <span className="tag">{COPY.you}</span>}
               {p.id === data.hostPlayerId && <span className="tag tag--host">{COPY.host}</span>}
+              {p.bot && <span className="tag">🤖 {COPY.levels[p.bot]}</span>}
+              {isHost && p.id !== playerId && (
+                <button
+                  type="button"
+                  className="btn btn--small btn--ghost lobby__rename"
+                  aria-label={`${COPY.remove} ${p.name}`}
+                  onClick={() => void act({ type: 'remove', roomId, playerId: p.id })}
+                >
+                  {COPY.remove}
+                </button>
+              )}
               {p.id === playerId && (
                 <button type="button" className="btn btn--small btn--ghost lobby__rename" onClick={() => setEditing(p.name)}>
                   {COPY.changeName}
@@ -120,6 +139,27 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
           ),
         )}
       </ul>
+
+      {isHost && data.players.length < MAX_PLAYERS && (
+        <div className="addbot">
+          <div className="addbot__levels" role="group" aria-label={COPY.difficulty}>
+            {BOT_LEVELS.map((l) => (
+              <button
+                key={l}
+                type="button"
+                className={`picker__pill ${l === botLevel ? 'picker__pill--on' : ''}`}
+                aria-pressed={l === botLevel}
+                onClick={() => setBotLevel(l)}
+              >
+                {COPY.levels[l]}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="btn" onClick={() => void act({ type: 'add-bot', roomId, level: botLevel })}>
+            {COPY.addComputer}
+          </button>
+        </div>
+      )}
 
       {isHost ? (
         <button

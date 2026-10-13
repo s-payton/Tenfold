@@ -72,9 +72,9 @@ export const App = () => {
           savedRoom={loadSavedRoom()}
           busy={busy}
           error={error}
-          onLocal={(opponents) => {
+          onLocal={(opponents, level) => {
             const seed = seedFromUrl();
-            const client = createLocalGame({ opponents, ...(seed === undefined ? {} : { seed }) });
+            const client = createLocalGame({ opponents, level, ...(seed === undefined ? {} : { seed }) });
             setScreen({ kind: 'game', client, online: false });
           }}
           onCreate={(name) => void enterRoom(callGame({ type: 'create', name }), name)}
@@ -87,6 +87,7 @@ export const App = () => {
           playerId={screen.room.playerId}
           onStarted={onStarted}
           onLeave={() => {
+            void callGame({ type: 'leave', roomId: screen.room.roomId });
             saveRoom(null);
             goHome();
           }}

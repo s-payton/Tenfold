@@ -1,7 +1,7 @@
 import {
   DEFAULT_RULES,
   applyMove,
-  basicMove,
+  botMove,
   createGame,
   publicView,
   startNextHand,
@@ -9,6 +9,7 @@ import {
   type Move,
   type MoveError,
   type PublicView,
+  type BotLevel,
   type RulesConfig,
 } from '@tenfold/engine';
 import type { GameClient } from './client.ts';
@@ -18,15 +19,13 @@ const OPPONENT_NAMES = ['Ada', 'Bo', 'Cy', 'Dee', 'Eli'];
 
 export interface LocalGameOptions {
   readonly opponents: number;
+  readonly level?: BotLevel;
   readonly seed?: number;
   readonly botDelayMs?: number;
   readonly config?: RulesConfig;
 }
 
-/**
- * A whole game running in the browser for UI work. Opponents use the engine's simple
- * `basicMove` (lay down when possible, hit, keep Wilds) until the tiered bots exist.
- */
+/** A whole game against computer opponents, running entirely in the browser. */
 export const createLocalGame = (options: LocalGameOptions): GameClient => {
   const config = options.config ?? DEFAULT_RULES;
   const delay = options.botDelayMs ?? 700;
@@ -52,7 +51,7 @@ export const createLocalGame = (options: LocalGameOptions): GameClient => {
     const current = state.players[state.currentIndex];
     if (state.status !== 'playing' || !current || current.id === HUMAN_ID) return;
     timer = setTimeout(() => {
-      const move = basicMove(publicView(state, current.id), config);
+      const move = botMove(publicView(state, current.id), config, options.level ?? 'medium');
       const result = applyMove(state, current.id, move, config);
       if (result.ok) commit(result.state);
     }, delay);
