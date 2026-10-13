@@ -92,3 +92,10 @@ Measured before: about 500 to 600 ms per move at the function, plus a follow-up 
 - **Missed turns:** the server auto-plays (draw, discard the highest non-Wild) and counts the miss. After 2 in a row, a Medium bot plays the seat. Any move by the person, or the "I'm back" button (`reclaim`), clears it. Leaving mid-game hands the seat to a bot at once.
 - **Computer players in rooms:** the host can add Easy, Medium or Hard seats in the lobby. They have no member row, so no `hands` row is ever written for them. The host can remove seats, and anyone can leave the lobby; the host role passes to the next person, and a room with no people left closes.
 - **Old rooms are deleted nightly** after 3 days without changes (pg_cron).
+
+## 2026-10-14: Installable app
+
+- **vite-plugin-pwa** with `registerType: 'autoUpdate'`. The manifest uses the `/Tenfold/` base for `start_url` and `scope`, portrait orientation, and felt-green theme colors. Icons (192, 512, maskable 512 with a safe margin, Apple 180) are rendered from one SVG.
+- **Offline:** the service worker precaches the app shell, so games against the computer work with no connection. Online play needs the network, as expected.
+- **Install:** Chrome and Android get an "Install the app" button from `beforeinstallprompt`; iPhone gets a one-line Share, Add to Home Screen hint. Both hide once installed.
+- **Smaller first load:** everything that needs Supabase (`net/online.ts`, the lobby) is a lazy chunk loaded on first use of "Play with friends".

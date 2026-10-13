@@ -38,10 +38,15 @@ export const createRemoteGame = (
       else if (result.error.code === 'too-early') clockTimer = setTimeout(askTimeout, 1000);
     });
   };
-  const watchClock = (deadline: number | null) => {
+  const watchClock = (data: typeof roomData) => {
     clearTimeout(clockTimer);
+    const deadline = data.turnDeadline;
     if (deadline === null) return;
-    const wait = Math.max(0, deadline - Date.now()) + 250 + Math.random() * 750;
+    // Computer seats wait on purpose, so ask promptly; a person's time gets a wider spread.
+    const currentId = data.table?.players[data.table.currentIndex]?.id;
+    const botTurn = data.players.some((p) => p.id === currentId && p.bot);
+    const spread = botTurn ? 100 + Math.random() * 250 : 250 + Math.random() * 750;
+    const wait = Math.max(0, deadline - Date.now()) + spread;
     clockTimer = setTimeout(askTimeout, wait);
   };
 
@@ -50,7 +55,7 @@ export const createRemoteGame = (
     roomId,
     (snapshot) => {
       roomData = snapshot.data;
-      watchClock(snapshot.data.turnDeadline);
+      watchClock(snapshot.data);
       const next = toView(snapshot, playerId);
       if (!next) return;
       confirmed = next;

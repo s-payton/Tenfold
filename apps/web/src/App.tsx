@@ -1,12 +1,10 @@
-import { useCallback, useState } from 'react';
+import { Suspense, lazy, useCallback, useState } from 'react';
 import { COPY, apiErrorMessage } from './copy.ts';
 import { GameScreen } from './components/GameScreen.tsx';
 import { Home } from './components/Home.tsx';
-import { Lobby } from './components/Lobby.tsx';
 import type { GameClient } from './game/client.ts';
 import { createLocalGame } from './game/localGame.ts';
-import { callGame } from './net/api.ts';
-import { createRemoteGame } from './net/remoteGame.ts';
+import type { ApiResult } from './net/api.ts';
 import type { RoomSnapshot } from './net/room.ts';
 import { loadName, loadSavedRoom, saveName, saveRoom, type SavedRoom } from './net/savedRoom.ts';
 
@@ -14,6 +12,10 @@ type Screen =
   | { readonly kind: 'home' }
   | { readonly kind: 'lobby'; readonly room: SavedRoom }
   | { readonly kind: 'game'; readonly client: GameClient; readonly online: boolean };
+
+// Online play (Supabase) loads on first use, so the computer game stays small and offline-ready.
+const online = () => import('./net/online.ts');
+const Lobby = lazy(() => import('./components/Lobby.tsx').then((m) => ({ default: m.Lobby })));
 
 const params = new URLSearchParams(window.location.search);
 
@@ -31,7 +33,7 @@ export const App = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const enterRoom = async (request: Promise<Awaited<ReturnType<typeof callGame>>>, name: string) => {
+  const enterRoom = async (request: Promise<ApiResult>, name: string) => {
     setBusy(true);
     setError(null);
     saveName(name);
@@ -51,8 +53,10 @@ export const App = () => {
   const onStarted = useCallback(
     (snapshot: RoomSnapshot) => {
       if (!lobbyRoom) return;
-      const client = createRemoteGame(lobbyRoom.roomId, lobbyRoom.playerId, snapshot);
-      if (client) setScreen({ kind: 'game', client, online: true });
+      void online().then(({ createRemoteGame }) => {
+        const client = createRemoteGame(lobbyRoom.roomId, lobbyRoom.playerId, snapshot);
+        if (client) setScreen({ kind: 'game', client, online: true });
+      });
     },
     [lobbyRoom],
   );
@@ -77,21 +81,26 @@ export const App = () => {
             const client = createLocalGame({ opponents, level, ...(seed === undefined ? {} : { seed }) });
             setScreen({ kind: 'game', client, online: false });
           }}
-          onCreate={(name) => void enterRoom(callGame({ type: 'create', name }), name)}
-          onJoin={(name, code) => void enterRoom(callGame({ type: 'join', code, name }), name)}
+          onCreate={(name) => void enterRoom(online().then((m) => m.callGame({ type: 'create', name })), name)}
+          onJoin={(name, code) =>
+            void enterRoom(online().then((m) => m.callGame({ type: 'join', code, name })), name)
+          }
         />
       )}
       {screen.kind === 'lobby' && (
+        <Suspense fallback={<main className="lobby">{COPY.connecting}</main>}>
         <Lobby
           roomId={screen.room.roomId}
           playerId={screen.room.playerId}
           onStarted={onStarted}
           onLeave={() => {
-            void callGame({ type: 'leave', roomId: screen.room.roomId });
+            const roomId = screen.room.roomId;
+            void online().then((m) => m.callGame({ type: 'leave', roomId }));
             saveRoom(null);
             goHome();
           }}
         />
+        </Suspense>
       )}
       {screen.kind === 'game' && <GameScreen client={screen.client} onExit={goHome} />}
       <div className="rotate" aria-hidden="true">

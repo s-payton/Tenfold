@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs><radialGradient id="g" cx="50%" cy="40%" r="75%"><stop offset="0" stop-color="#22794f"/><stop offset="1" stop-color="#0c3a26"/></radialGradient></defs>
+  <rect width="512" height="512" fill="url(#g)"/>
+  <g transform="translate(0 0) scale(1)">
+    <rect x="96" y="96" width="320" height="320" rx="72" fill="#fcb52b"/>
+    <text x="256" y="350" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="270" font-weight="700" fill="#1a1200">X</text>
+  </g>
+</svg>

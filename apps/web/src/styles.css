@@ -1109,3 +1109,10 @@ input:focus {
   color: var(--ink-soft);
   font-size: 0.9rem;
 }
+
+.install-hint {
+  margin: 0;
+  max-width: 300px;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}

@@ -3,6 +3,7 @@ import { BOT_LEVELS, DEFAULT_RULES, type BotLevel } from '@tenfold/engine';
 import { unlockAudio } from '../audio.ts';
 import { COPY, describeLevel } from '../copy.ts';
 import type { SavedRoom } from '../net/savedRoom.ts';
+import { useInstall } from '../install.ts';
 
 const OPPONENT_CHOICES = [1, 2, 3, 4, 5];
 type Mode = 'computer' | 'friends';
@@ -42,6 +43,7 @@ export const Home = (props: Props) => {
   };
 
   const error = localError ?? props.error;
+  const install = useInstall();
 
   return (
     <main className="home">
@@ -168,6 +170,13 @@ export const Home = (props: Props) => {
           )}
         </div>
       )}
+
+      {install.kind === 'prompt' && (
+        <button type="button" className="btn" onClick={install.install}>
+          {COPY.installApp}
+        </button>
+      )}
+      {install.kind === 'ios-hint' && <p className="install-hint">{COPY.installIos}</p>}
 
       <dl className="glossary">
         {COPY.glossary.map(([term, meaning]) => (

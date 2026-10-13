@@ -94,6 +94,8 @@ export const COPY = {
   addComputer: 'Add computer player',
   remove: 'Remove',
   computer: 'Computer',
+  installApp: 'Install the app',
+  installIos: 'To install: tap the Share button, then Add to Home Screen.',
   crashed: 'Something went wrong on this screen.',
   reload: 'Reload',
 } as const;
