@@ -44,3 +44,10 @@ Short log of architecture choices. Newest at the bottom.
 - **All UI wording lives in `apps/web/src/copy.ts`**, which says "level" everywhere.
 - **`?seed=<n>`** in the URL replays the same local deal, for testing and bug reports.
 - **Deploy:** pushes to `main` build `apps/web` and publish it to GitHub Pages under `/Tenfold/` (case-sensitive, matches the repo name). The PWA manifest and icons come in build step 6.
+
+## 2026-10-13: Level finder and simple opponents
+
+- **`findLevel(hand, level, config)`** searches for a lay-down using the minimum cards per group, trying more natural cards first so Wilds stay free for later groups. **`findHits`** lists every legal single-card hit. Both are the base for the tiered bots.
+- **Bot and timeout moves take a `PublicView`**, never `GameState`, matching the `(publicState, hand, config) => Move` rule. A bot cannot see other hands or the deck order even by accident.
+- **`basicMove`** drives the local opponents for now: take a Wild from the discard pile, lay down as soon as possible, hit whenever possible, discard the highest card that is not a Wild. This pulls part of build step 5 forward because the owner is playtesting.
+- **A Skip on top of the discard pile stays tappable** so the player gets told why it cannot be taken, instead of a silent no-op.

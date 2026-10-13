@@ -199,7 +199,9 @@ export const GameScreen = ({ client, onExit }: Props) => {
   const hint = !isMyTurn
     ? COPY.waiting(names[current?.id ?? ''] ?? '')
     : canDraw
-      ? COPY.drawHint
+      ? view.discardTop?.kind === 'skip'
+        ? COPY.drawHintSkipOnTop
+        : COPY.drawHint
       : me?.laidDown
         ? COPY.playHintLaidDown
         : COPY.playHint;

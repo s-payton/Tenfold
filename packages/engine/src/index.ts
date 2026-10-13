@@ -9,3 +9,4 @@ export * from './game.ts';
 export * from './moves.ts';
 export * from './view.ts';
 export * from './auto.ts';
+export * from './solver.ts';

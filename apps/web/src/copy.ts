@@ -12,6 +12,7 @@ export const COPY = {
   start: 'Deal me in',
   opponentsLabel: 'Opponents',
   drawHint: 'Your turn. Draw from the deck or take the top discard.',
+  drawHintSkipOnTop: 'Your turn. Draw from the deck. Skips cannot be picked up.',
   playHint: 'Lay down, hit, or pick a card to discard.',
   playHintLaidDown: 'Hit on any group, or pick a card to discard.',
   waiting: (name: string) => `${name} is playing...`,

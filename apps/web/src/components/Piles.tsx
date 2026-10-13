@@ -12,6 +12,7 @@ interface Props {
 
 export const Piles = ({ view, canDraw, onDrawDeck, onDrawDiscard }: Props) => {
   const top = view.discardTop;
+  // A Skip on top stays tappable so the engine's refusal can explain why.
   const canTakeDiscard = canDraw && top !== null && top.kind !== 'skip';
   return (
     <div className="piles">
@@ -33,7 +34,7 @@ export const Piles = ({ view, canDraw, onDrawDeck, onDrawDiscard }: Props) => {
                 key={top.id}
                 card={top}
                 size="lg"
-                {...(canTakeDiscard ? { onClick: onDrawDiscard } : {})}
+                {...(canDraw ? { onClick: onDrawDiscard } : {})}
               />
             )}
           </AnimatePresence>

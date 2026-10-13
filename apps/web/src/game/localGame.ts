@@ -1,7 +1,7 @@
 import {
   DEFAULT_RULES,
   applyMove,
-  autoMove,
+  basicMove,
   createGame,
   publicView,
   startNextHand,
@@ -24,8 +24,8 @@ export interface LocalGameOptions {
 }
 
 /**
- * A whole game running in the browser for UI work. Opponents use the timeout auto-play
- * (draw from deck, discard the highest card) until real bots exist.
+ * A whole game running in the browser for UI work. Opponents use the engine's simple
+ * `basicMove` (lay down when possible, hit, keep Wilds) until the tiered bots exist.
  */
 export const createLocalGame = (options: LocalGameOptions): GameClient => {
   const config = options.config ?? DEFAULT_RULES;
@@ -52,7 +52,8 @@ export const createLocalGame = (options: LocalGameOptions): GameClient => {
     const current = state.players[state.currentIndex];
     if (state.status !== 'playing' || !current || current.id === HUMAN_ID) return;
     timer = setTimeout(() => {
-      const result = applyMove(state, current.id, autoMove(state, config), config);
+      const move = basicMove(publicView(state, current.id), config);
+      const result = applyMove(state, current.id, move, config);
       if (result.ok) commit(result.state);
     }, delay);
   };
