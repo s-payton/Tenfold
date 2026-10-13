@@ -70,12 +70,19 @@ describe('join', () => {
     ]);
   });
 
-  it('rejoins the same seat for the same user', async () => {
+  it('rejoins the same seat for the same user, renaming it while in the lobby', async () => {
     const t = await lobby(2);
     const before = roomOf(t.rooms, t.roomId).data.players[1]?.id;
     const again = okResult(await t.act('u1', { type: 'join', code: t.code, name: 'Renamed' }));
     expect(again.playerId).toBe(before);
-    expect(roomOf(t.rooms, t.roomId).data.players).toHaveLength(2);
+    expect(roomOf(t.rooms, t.roomId).data.players.map((p) => p.name)).toEqual(['Host', 'Renamed']);
+  });
+
+  it('keeps the name once the game has started', async () => {
+    const t = await lobby(2);
+    okResult(await t.act('u0', { type: 'start', roomId: t.roomId }));
+    okResult(await t.act('u1', { type: 'join', code: t.code, name: 'Late rename' }));
+    expect(roomOf(t.rooms, t.roomId).data.players.map((p) => p.name)).toEqual(['Host', 'P1']);
   });
 
   it('rejects unknown codes, full rooms, and games already started', async () => {
@@ -132,6 +139,26 @@ describe('start', () => {
       ['u1', 10],
       ['u2', 10],
     ]);
+  });
+});
+
+describe('snapshot in the reply', () => {
+  it('returns the saved version, the room data and only the caller\'s hand', async () => {
+    const t = await lobby(2);
+    const result = okResult(await t.act('u0', { type: 'start', roomId: t.roomId }));
+    const room = roomOf(t.rooms, t.roomId);
+    expect(result.snapshot.version).toBe(room.version);
+    expect(result.snapshot.data).toEqual(room.data);
+    expect(result.snapshot.cards).toEqual(room.game?.players.find((p) => p.id === result.playerId)?.hand);
+    const others = room.game?.players.filter((p) => p.id !== result.playerId).flatMap((p) => p.hand) ?? [];
+    const json = JSON.stringify(result);
+    for (const card of others) expect(json).not.toContain(`"${card.id}"`);
+  });
+
+  it('has no hand before the game starts', async () => {
+    const t = setup();
+    const result = okResult(await t.act('u0', { type: 'create', name: 'A' }));
+    expect(result.snapshot).toMatchObject({ version: 1, cards: null });
   });
 });
 

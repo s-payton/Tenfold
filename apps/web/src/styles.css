@@ -868,3 +868,12 @@ input:focus {
   color: var(--ink-soft);
   font-size: 0.9rem;
 }
+
+.lobby__rename {
+  margin-left: auto;
+}
+
+.lobby__players li input {
+  flex: 1;
+  min-width: 0;
+}

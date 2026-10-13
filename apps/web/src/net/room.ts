@@ -1,14 +1,8 @@
 import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
-import type { Card } from '@tenfold/engine';
-import type { RoomData } from '@tenfold/server';
+import type { RoomData, RoomSnapshot } from '@tenfold/server';
 import { supabase } from './supabase.ts';
 
-export interface RoomSnapshot {
-  readonly version: number;
-  readonly data: RoomData;
-  /** This player's hand. Null before the game starts. */
-  readonly cards: readonly Card[] | null;
-}
+export type { RoomSnapshot };
 
 const MAX_READ_ATTEMPTS = 6;
 const RETRY_MS = 150;
@@ -39,25 +33,47 @@ export const readRoom = async (roomId: string): Promise<RoomSnapshot | null> => 
 };
 
 export interface RoomWatch {
-  /** Re-reads now, for example right after this player's own move. */
+  /** Re-reads now. */
   readonly refresh: () => void;
+  /** Applies a snapshot the server sent back with a reply. */
+  readonly push: (snapshot: RoomSnapshot) => void;
   readonly stop: () => void;
 }
 
 /**
- * Calls `onSnapshot` with the room now and after every change. Realtime pushes changes;
- * a slow poll and a re-read when the page becomes visible cover dropped connections.
+ * Calls `onSnapshot` with the room now and after every change.
+ *
+ * Realtime messages carry the new public room data. A player's own hand only changes on
+ * their own moves (which come back in the reply) or on a new deal, so within a hand a
+ * message can be applied straight away with the hand already known. Anything else
+ * triggers a full re-read. A slow poll and a re-read on wake cover dropped connections.
  */
 export const watchRoom = (roomId: string, onSnapshot: (snapshot: RoomSnapshot) => void): RoomWatch => {
   let stopped = false;
-  let latest = 0;
+  let current: RoomSnapshot | null = null;
+
+  const push = (snapshot: RoomSnapshot) => {
+    if (stopped || (current && snapshot.version <= current.version)) return;
+    current = snapshot;
+    onSnapshot(snapshot);
+  };
+
   const refresh = () => {
     void readRoom(roomId).then((snapshot) => {
-      if (stopped || !snapshot || snapshot.version < latest) return;
-      latest = snapshot.version;
-      onSnapshot(snapshot);
+      if (snapshot) push(snapshot);
     });
   };
+
+  const onMessage = (row: { version?: unknown; data?: unknown }) => {
+    const version = typeof row.version === 'number' ? row.version : null;
+    const data = row.data as RoomData | undefined;
+    const known = current;
+    const sameHand =
+      known?.cards && data?.table && known.data.table?.handNumber === data.table.handNumber;
+    if (version !== null && data && known && sameHand) push({ version, data, cards: known.cards });
+    else refresh();
+  };
+
   // Supabase reuses a channel with the same topic, so every watch gets its own.
   watchCount += 1;
   const channel = supabase
@@ -65,7 +81,7 @@ export const watchRoom = (roomId: string, onSnapshot: (snapshot: RoomSnapshot) =
     .on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'room_states', filter: `room_id=eq.${roomId}` },
-      refresh,
+      (payload) => onMessage(payload.new),
     )
     .subscribe((status) => {
       if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) refresh();
@@ -78,6 +94,7 @@ export const watchRoom = (roomId: string, onSnapshot: (snapshot: RoomSnapshot) =
   refresh();
   return {
     refresh,
+    push,
     stop: () => {
       stopped = true;
       clearInterval(poll);

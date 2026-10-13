@@ -32,6 +32,10 @@ export const Home = (props: Props) => {
       setLocalError(COPY.needName);
       return;
     }
+    if (trimmed.toUpperCase() === code.trim().toUpperCase()) {
+      setLocalError(COPY.nameIsCode);
+      return;
+    }
     setLocalError(null);
     run(trimmed);
   };
@@ -105,6 +109,7 @@ export const Home = (props: Props) => {
             <input
               value={name}
               maxLength={16}
+              placeholder={COPY.namePlaceholder}
               autoComplete="nickname"
               onChange={(e) => setName(e.target.value)}
             />
@@ -118,13 +123,16 @@ export const Home = (props: Props) => {
             {props.busy ? COPY.working : COPY.createRoom}
           </button>
           <p className="friends__or">{COPY.haveCode}</p>
+          <label className="field" htmlFor="room-code">
+            <span>{COPY.roomCode}</span>
+          </label>
           <div className="join">
             <input
+              id="room-code"
               className="join__code"
               value={code}
               maxLength={4}
               placeholder="ABCD"
-              aria-label={COPY.roomCode}
               autoCapitalize="characters"
               autoComplete="off"
               onChange={(e) => setCode(e.target.value.toUpperCase())}

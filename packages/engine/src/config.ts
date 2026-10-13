@@ -12,6 +12,11 @@ export interface RulesConfig {
   readonly skipLosesTurn: boolean;
   /** Wilds may be discarded. */
   readonly allowWildDiscard: boolean;
+  /**
+   * Who plays first in the next hand. 'hand-winner': whoever went out leads (house rule,
+   * the owner's choice). 'left-of-dealer': the deal passes left, as on the rule sheet.
+   */
+  readonly nextHandLeader: 'hand-winner' | 'left-of-dealer';
 }
 
 export const DEFAULT_RULES: RulesConfig = {
@@ -21,4 +26,5 @@ export const DEFAULT_RULES: RulesConfig = {
   allowHitOnOthers: true,
   skipLosesTurn: true,
   allowWildDiscard: true,
+  nextHandLeader: 'hand-winner',
 };

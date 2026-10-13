@@ -3,6 +3,7 @@ import { MAX_PLAYERS, MIN_PLAYERS } from '@tenfold/engine';
 import { COPY, apiErrorMessage } from '../copy.ts';
 import { callGame } from '../net/api.ts';
 import { watchRoom, type RoomSnapshot } from '../net/room.ts';
+import { saveName } from '../net/savedRoom.ts';
 
 interface Props {
   readonly roomId: string;
@@ -20,6 +21,7 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
   const [notice, setNotice] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const handedOff = useRef(false);
+  const [editing, setEditing] = useState<string | null>(null);
 
   useEffect(() => {
     const watch = watchRoom(roomId, (next) => {
@@ -56,6 +58,21 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
     }
   };
 
+  const rename = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setError(null);
+    // Joining again with a new name renames this seat while the room is in the lobby.
+    const result = await callGame({ type: 'join', code: data.code, name: trimmed });
+    if (!result.ok) {
+      setError(apiErrorMessage(result.error));
+      return;
+    }
+    saveName(trimmed);
+    setEditing(null);
+    setSnapshot(result.snapshot);
+  };
+
   const start = async () => {
     setStarting(true);
     setError(null);
@@ -75,13 +92,33 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
 
       <h2 className="lobby__heading">{COPY.playersCount(data.players.length, MAX_PLAYERS)}</h2>
       <ul className="lobby__players">
-        {data.players.map((p) => (
-          <li key={p.id}>
-            <span>{p.name}</span>
-            {p.id === playerId && <span className="tag">{COPY.you}</span>}
-            {p.id === data.hostPlayerId && <span className="tag tag--host">{COPY.host}</span>}
-          </li>
-        ))}
+        {data.players.map((p) =>
+          p.id === playerId && editing !== null ? (
+            <li key={p.id}>
+              <input
+                aria-label={COPY.yourName}
+                value={editing}
+                maxLength={16}
+                autoFocus
+                onChange={(e) => setEditing(e.target.value)}
+              />
+              <button type="button" className="btn btn--small btn--primary" onClick={() => void rename(editing)}>
+                {COPY.save}
+              </button>
+            </li>
+          ) : (
+            <li key={p.id}>
+              <span>{p.name}</span>
+              {p.id === playerId && <span className="tag">{COPY.you}</span>}
+              {p.id === data.hostPlayerId && <span className="tag tag--host">{COPY.host}</span>}
+              {p.id === playerId && (
+                <button type="button" className="btn btn--small btn--ghost lobby__rename" onClick={() => setEditing(p.name)}>
+                  {COPY.changeName}
+                </button>
+              )}
+            </li>
+          ),
+        )}
       </ul>
 
       {isHost ? (

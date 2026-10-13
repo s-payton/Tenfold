@@ -1,4 +1,4 @@
-import type { GameState, Move, MoveError, TableView } from '@tenfold/engine';
+import type { Card, GameState, Move, MoveError, TableView } from '@tenfold/engine';
 
 export type RoomStatus = 'lobby' | 'playing' | 'finished';
 
@@ -70,6 +70,21 @@ export type ServerError =
     }
   | { readonly code: 'move-rejected'; readonly error: MoveError };
 
+/** What one player may see of a room right after a save: shared data plus their own hand. */
+export interface RoomSnapshot {
+  readonly version: number;
+  readonly data: RoomData;
+  /** The caller's hand. Null before the game starts. */
+  readonly cards: readonly Card[] | null;
+}
+
 export type ActionResult =
-  | { readonly ok: true; readonly roomId: string; readonly code: string; readonly playerId: string }
+  | {
+      readonly ok: true;
+      readonly roomId: string;
+      readonly code: string;
+      readonly playerId: string;
+      /** Lets the caller show the result without reading it back. */
+      readonly snapshot: RoomSnapshot;
+    }
   | { readonly ok: false; readonly error: ServerError };

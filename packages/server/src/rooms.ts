@@ -10,7 +10,7 @@ import {
   type GameState,
 } from '@tenfold/engine';
 import { ROOM_CODE_LENGTH, ROOM_CODE_LETTERS } from './parse.ts';
-import type { Action, ActionResult, Deps, ServerError, Store, StoredRoom } from './types.ts';
+import type { Action, ActionResult, Deps, RoomSnapshot, ServerError, Store, StoredRoom } from './types.ts';
 
 const rules = DEFAULT_RULES;
 const CODE_ATTEMPTS = 20;
@@ -61,17 +61,30 @@ const mutate = async (
     if (!room) return fail({ code: 'room-not-found' });
     const result = change(room);
     if (!result.ok) return fail(result.error);
-    const done = { ok: true, roomId: room.id, code: room.code, playerId: result.playerId } as const;
-    if (result.room === room) return done;
-    if (await store.saveRoom(result.room, room.version)) return done;
+    const done = (saved: StoredRoom, version: number): ActionResult => ({
+      ok: true,
+      roomId: room.id,
+      code: room.code,
+      playerId: result.playerId,
+      snapshot: snapshotFor(saved, result.playerId, version),
+    });
+    if (result.room === room) return done(room, room.version);
+    if (await store.saveRoom(result.room, room.version)) return done(result.room, room.version + 1);
   }
   return fail({ code: 'busy' });
 };
 
+/** The snapshot `playerId` sees of `room` once it is saved at `version`. */
+export const snapshotFor = (room: StoredRoom, playerId: string, version: number): RoomSnapshot => ({
+  version,
+  data: room.data,
+  cards: room.game ? (room.game.players.find((p) => p.id === playerId)?.hand ?? []) : null,
+});
+
 const memberOf = (room: StoredRoom, userId: string) =>
   room.members.find((m) => m.userId === userId)?.playerId;
 
-const create = async (store: Store, deps: Deps, userId: string, name: string) => {
+const create = async (store: Store, deps: Deps, userId: string, name: string): Promise<ActionResult> => {
   const playerId = deps.newId();
   for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt++) {
     const code = roomCode(deps.random);
@@ -83,14 +96,22 @@ const create = async (store: Store, deps: Deps, userId: string, name: string) =>
       game: null,
       members: [{ playerId, userId }],
     };
-    if (await store.createRoom(room)) return { ok: true, roomId: room.id, code, playerId } as const;
+    if (await store.createRoom(room)) {
+      return { ok: true, roomId: room.id, code, playerId, snapshot: snapshotFor(room, playerId, 1) };
+    }
   }
   return fail({ code: 'busy' });
 };
 
 const join = (deps: Deps, userId: string, name: string) => (room: StoredRoom): Change => {
   const existing = memberOf(room, userId);
-  if (existing) return { ok: true, room, playerId: existing };
+  if (existing) {
+    const seat = room.data.players.find((p) => p.id === existing);
+    // Rejoining from the lobby with a new name renames the seat.
+    if (room.data.status !== 'lobby' || seat?.name === name) return { ok: true, room, playerId: existing };
+    const players = room.data.players.map((p) => (p.id === existing ? { ...p, name } : p));
+    return { ok: true, playerId: existing, room: { ...room, data: { ...room.data, players } } };
+  }
   if (room.data.status !== 'lobby') return { ok: false, error: { code: 'game-started' } };
   if (room.data.players.length >= MAX_PLAYERS) return { ok: false, error: { code: 'room-full' } };
   const playerId = deps.newId();

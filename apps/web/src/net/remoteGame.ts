@@ -25,6 +25,7 @@ export const createRemoteGame = (
     view = next;
     for (const listener of listeners) listener();
   });
+  watch.push(initial);
 
   return {
     config: DEFAULT_RULES,
@@ -38,13 +39,16 @@ export const createRemoteGame = (
     send: async (move: Move): Promise<SendError | null> => {
       const result = await callGame({ type: 'move', roomId, move });
       if (result.ok) {
-        watch.refresh();
+        watch.push(result.snapshot);
         return null;
       }
       return result.error.code === 'move-rejected' ? result.error.error : { code: 'offline' };
     },
     nextHand: () => {
-      void callGame({ type: 'next-hand', roomId }).then(() => watch.refresh());
+      void callGame({ type: 'next-hand', roomId }).then((result) => {
+        if (result.ok) watch.push(result.snapshot);
+        else watch.refresh();
+      });
     },
     dispose: () => {
       watch.stop();

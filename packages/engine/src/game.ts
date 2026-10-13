@@ -137,12 +137,21 @@ export const endHand = (state: GameState, winnerIndex: number, config: RulesConf
   };
 };
 
-/** Deals the next hand after one ends. The deal passes to the left. */
+/** Picks the next dealer. The first player is always the one left of the dealer. */
+const nextDealer = (state: GameState, config: RulesConfig): number => {
+  const count = state.players.length;
+  const winner = state.players.findIndex((p) => p.id === state.handWinnerId);
+  return config.nextHandLeader === 'hand-winner' && winner >= 0
+    ? (winner - 1 + count) % count
+    : (state.dealerIndex + 1) % count;
+};
+
+/** Deals the next hand after one ends. */
 export const startNextHand = (state: GameState, config: RulesConfig): MoveResult => {
   if (state.status !== 'hand-over') return { ok: false, error: { code: 'hand-not-over' } };
   const setup: HandSetup = {
     players: state.players,
-    dealerIndex: (state.dealerIndex + 1) % state.players.length,
+    dealerIndex: nextDealer(state, config),
     handNumber: state.handNumber + 1,
     seed: state.seed,
   };

@@ -62,3 +62,13 @@ Short log of architecture choices. Newest at the bottom.
 - **Clients read, Realtime nudges.** Clients subscribe to `room_states` changes and then re-read the public row and their own hand, retrying until both carry the same version, so the table and hand never disagree.
 - **Untrusted input:** request bodies are parsed into well-formed actions (`parseAction`) before the engine judges legality. Names are trimmed and capped at 16 characters. Room codes are 4 consonants.
 - **Deploy:** on push to main, CI syncs the shared code, runs `supabase db push`, and deploys the function. It skips itself until `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` are set as GitHub Actions secrets.
+
+## 2026-10-13: Faster online moves
+
+Measured before: about 500 to 600 ms per move at the function, plus a follow-up re-read and the Realtime delay.
+
+- **Replies carry a snapshot** (version, room data, the caller's own hand), so the mover's screen updates from the reply with no re-read.
+- **Realtime messages are applied directly.** A player's hand only changes on their own moves or a new deal, so within a hand the new public row from the message plus the known hand is a complete, consistent snapshot. A new hand or anything unexpected falls back to a full re-read.
+- **`getClaims` instead of `getUser`** in the function: the session token is verified locally against cached signing keys, with no auth server call per move.
+- **One query to load a room** (seats embedded through the foreign key) instead of two.
+- **Function pinned to us-east-1**, the database's region, via the client's `region` option.

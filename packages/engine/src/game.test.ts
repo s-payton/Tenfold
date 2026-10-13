@@ -531,10 +531,10 @@ describe('startNextHand', () => {
     );
   };
 
-  it('deals a fresh hand, rotates the dealer, and keeps levels and scores', () => {
+  it('deals a fresh hand and keeps levels and scores', () => {
     const before = finished();
     const s = ok(startNextHand(before, rules));
-    expect(s).toMatchObject({ status: 'playing', handNumber: 2, dealerIndex: 1, table: [] });
+    expect(s).toMatchObject({ status: 'playing', handNumber: 2, table: [] });
     expect(s.players.map((p) => [p.level, p.score, p.laidDown])).toEqual([
       [2, 0, false],
       [1, 25, false],
@@ -542,6 +542,34 @@ describe('startNextHand', () => {
     ]);
     expect(s.players.every((p) => p.hand.length === 10)).toBe(true);
     expect(allCards(s)).toHaveLength(108);
+  });
+
+  it('by default the player who went out leads the next hand', () => {
+    // 'a' went out; 'a' sits left of the new dealer, so 'a' plays first.
+    const s = ok(startNextHand(finished(), rules));
+    expect(s.dealerIndex).toBe(2);
+    const leader = s.discardPile[0]?.kind === 'skip' ? 1 : 0;
+    expect(s.currentIndex).toBe(leader);
+  });
+
+  it('the hand winner leads even when they are not next in rotation', () => {
+    // Rotation alone would make 'b' deal and 'c' lead. 'b' went out, so 'b' leads.
+    const last = num('red', 3);
+    const wonByB = ok(
+      play(rig({ hands: [[], [last], []], current: 1, laidDown: [false, true, false] }), 'b', {
+        type: 'discard',
+        cardId: last.id,
+      }),
+    );
+    const s = ok(startNextHand(wonByB, rules));
+    expect(s.dealerIndex).toBe(0);
+    expect(s.players[s.currentIndex]?.id).toBe(s.discardPile[0]?.kind === 'skip' ? 'c' : 'b');
+  });
+
+  it('passes the deal to the left under the rule sheet setting', () => {
+    const sheet = { ...rules, nextHandLeader: 'left-of-dealer' as const };
+    const s = ok(startNextHand(finished(), sheet));
+    expect(s.dealerIndex).toBe(1);
   });
 
   it('only runs after a hand is over', () => {

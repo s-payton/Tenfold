@@ -1,3 +1,4 @@
+import { FunctionRegion } from '@supabase/supabase-js';
 import type { Action, ActionResult, ServerError } from '@tenfold/server';
 import { ensureSession, supabase } from './supabase.ts';
 
@@ -8,7 +9,11 @@ export type ApiResult = Extract<ActionResult, { ok: true }> | { readonly ok: fal
 export const callGame = async (action: Action): Promise<ApiResult> => {
   if (!(await ensureSession())) return { ok: false, error: { code: 'no-session' } };
   try {
-    const response = await supabase.functions.invoke<ActionResult>('game', { body: action });
+    // Run the function next to the database, so its queries stay short.
+    const response = await supabase.functions.invoke<ActionResult>('game', {
+      body: action,
+      region: FunctionRegion.UsEast1,
+    });
     return response.data ?? { ok: false, error: { code: 'offline' } };
   } catch {
     return { ok: false, error: { code: 'offline' } };

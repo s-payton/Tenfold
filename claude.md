@@ -56,6 +56,7 @@ Play:
 - A hand ends when a player goes out (no cards left). Others score the cards in their hand.
 - Scoring: 1 to 9 = 5 points, 10 to 12 = 10 points, Skip = 15, Wild = 25.
 - Players who did not complete their level repeat it next hand. Players who did advance.
+- House rule: whoever went out plays first in the next hand (`nextHandLeader: 'hand-winner'`).
 - Game ends when a player on level 10 goes out (lays level 10 and empties their hand). That player wins. Laying level 10 without going out does not win; that player repeats level 10 next hand. Points never decide the winner (house rule, see `docs/rules-notes.md`).
 
 Verify edge cases against the official rule sheet when writing tests, and list any ambiguity found in `docs/rules-notes.md`.

@@ -49,6 +49,7 @@ describe('DEFAULT_RULES', () => {
       allowHitOnOthers: true,
       skipLosesTurn: true,
       allowWildDiscard: true,
+      nextHandLeader: 'hand-winner',
     });
     expect(DEFAULT_RULES.levels).toBe(STANDARD_LEVELS);
   });

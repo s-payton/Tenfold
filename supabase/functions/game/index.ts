@@ -21,17 +21,16 @@ const json = (body: unknown, status = 200) =>
 
 const store: Store = {
   loadRoom: async (key) => {
-    const query = admin.from('rooms').select('id, code, version, data, game');
+    // One round trip: the room plus its seats, embedded through the foreign key.
+    const query = admin.from('rooms').select('id, code, version, data, game, room_players(player_id, user_id)');
     const { data: room, error } = await ('id' in key ? query.eq('id', key.id) : query.eq('code', key.code)).maybeSingle();
     if (error) throw error;
     if (!room) return null;
-    const { data: members, error: membersError } = await admin
-      .from('room_players')
-      .select('player_id, user_id')
-      .eq('room_id', room.id);
-    if (membersError) throw membersError;
+    const { room_players: members, ...rest } = room as typeof room & {
+      room_players: { player_id: string; user_id: string }[];
+    };
     return {
-      ...room,
+      ...rest,
       members: members.map((m) => ({ playerId: m.player_id, userId: m.user_id })),
     } as StoredRoom;
   },
@@ -68,15 +67,18 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ ok: false, error: { code: 'bad-request' } }, 405);
 
+  // getClaims checks the session token's signature locally against the project's
+  // cached public keys, so no call to the auth server on every move.
   const token = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
-  const { data: auth } = token ? await admin.auth.getUser(token) : { data: { user: null } };
-  if (!auth.user) return json({ ok: false, error: { code: 'unauthorized' } }, 401);
+  const { data: auth } = token ? await admin.auth.getClaims(token) : { data: null };
+  const userId = auth?.claims.role === 'authenticated' ? auth.claims.sub : undefined;
+  if (!userId) return json({ ok: false, error: { code: 'unauthorized' } }, 401);
 
   const action = parseAction(await req.json().catch(() => null));
   if (!action) return json({ ok: false, error: { code: 'bad-request' } }, 400);
 
   try {
-    return json(await handle(store, deps, auth.user.id, action));
+    return json(await handle(store, deps, userId, action));
   } catch (error) {
     console.error(error);
     return json({ ok: false, error: { code: 'server-error' } }, 500);
