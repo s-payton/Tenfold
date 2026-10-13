@@ -70,7 +70,7 @@ All variable behavior lives in a `RulesConfig` object with defaults set to stand
 - Join via a short room code plus a player-chosen display name. No accounts.
 - Player token stored in localStorage so a refresh or phone lock rejoins the same seat.
 - Everyone sees each player's current level next to their name (the simple leaderboard).
-- Turn timer: 30 seconds. On timeout the server auto-plays (draw from deck, discard highest-point card). After 2 missed turns in a row a bot takes the seat. The human can reclaim the seat when they return.
+- Turn timer: 30 seconds. On timeout the server auto-plays (draw from deck, discard the highest-point card that is not a Wild; a Wild only if nothing else is left). After 2 missed turns in a row a bot takes the seat. The human can reclaim the seat when they return.
 - Realtime via Supabase Realtime subscriptions on the room and public game state. Private hand state fetched under RLS.
 
 ## Bots

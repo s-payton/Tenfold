@@ -29,16 +29,22 @@ describe('autoMove (turn timeout)', () => {
       type: 'discard',
       cardId: ten.id,
     });
-    const w = wild();
-    expect(autoMove(position([skip(), w, ten], 'play'), rules)).toMatchObject({ cardId: w.id });
   });
 
-  it('skips a Wild when the house rule forbids discarding it', () => {
+  it('keeps Wilds, discarding the highest other card', () => {
     const s = skip();
-    const noWild = { ...rules, allowWildDiscard: false };
-    expect(autoMove(position([wild(), s, num('red', 1)], 'play'), noWild)).toMatchObject({
+    expect(autoMove(position([wild(), s, num('red', 12)], 'play'), rules)).toMatchObject({
       cardId: s.id,
     });
+    const ten = num('red', 10);
+    expect(autoMove(position([wild(), wild(), ten], 'play'), rules)).toMatchObject({
+      cardId: ten.id,
+    });
+  });
+
+  it('discards a Wild only when nothing else is left', () => {
+    const w = wild();
+    expect(autoMove(position([w, wild()], 'play'), rules)).toMatchObject({ cardId: w.id });
   });
 
   it('aims a Skip at the next player who can be skipped', () => {
