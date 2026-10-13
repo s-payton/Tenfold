@@ -143,7 +143,8 @@ const SERVER_ERRORS: Record<Exclude<ApiError['code'], 'move-rejected'>, string> 
   'not-started': 'The game has not started yet.',
   busy: 'The table is busy. Try again.',
   offline: 'Could not reach the table. Check your connection.',
-  'no-session': 'Could not connect. Multiplayer may not be switched on yet.',
+  'no-session': 'Could not connect. Check your connection and try again.',
+  'rate-limited': 'Too many new players from this network just now. Try again in a few minutes.',
 };
 
 export const apiErrorMessage = (error: ApiError): string =>
