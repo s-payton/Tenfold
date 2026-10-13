@@ -72,3 +72,7 @@ Measured before: about 500 to 600 ms per move at the function, plus a follow-up 
 - **`getClaims` instead of `getUser`** in the function: the session token is verified locally against cached signing keys, with no auth server call per move.
 - **One query to load a room** (seats embedded through the foreign key) instead of two.
 - **Function pinned to us-east-1**, the database's region, via the client's `region` option.
+- **Moves show instantly when they can.** `predictView` (engine) rebuilds a stand-in game state from the mover's own view, with hidden placeholder cards for everything they cannot see, and runs the real `applyMove` on it. Lay-down, hit and discard are predicted; draws (secret card) and hand-ending moves (scoring needs other hands) wait for the server. A property test checks the prediction equals the server's published view over thousands of random moves. The server reply replaces the prediction, and a refusal rolls it back.
+- **Moves are sent one at a time, in order**, so a quick lay-down then hit cannot arrive reversed.
+- **A reply wins over a Realtime echo at the same version.** While a move is in flight, Realtime messages are ignored, because the echo of our own move would pair the new public data with the old hand.
+- **Measured after:** discard and other predicted moves show in about 30 ms. A draw shows in about 0.5 s (the server round trip: function start, token check, one load and one save). Moving the function's database access to a direct Postgres connection could save roughly another 0.1 s if needed.

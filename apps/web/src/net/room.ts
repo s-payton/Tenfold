@@ -35,7 +35,7 @@ export const readRoom = async (roomId: string): Promise<RoomSnapshot | null> => 
 export interface RoomWatch {
   /** Re-reads now. */
   readonly refresh: () => void;
-  /** Applies a snapshot the server sent back with a reply. */
+  /** Applies a snapshot the server sent back with a reply. It wins over anything at its version. */
   readonly push: (snapshot: RoomSnapshot) => void;
   readonly stop: () => void;
 }
@@ -48,15 +48,32 @@ export interface RoomWatch {
  * message can be applied straight away with the hand already known. Anything else
  * triggers a full re-read. A slow poll and a re-read on wake cover dropped connections.
  */
-export const watchRoom = (roomId: string, onSnapshot: (snapshot: RoomSnapshot) => void): RoomWatch => {
+export const watchRoom = (
+  roomId: string,
+  onSnapshot: (snapshot: RoomSnapshot) => void,
+  /** True while this player has a move in flight; its reply will carry the result. */
+  isBusy: () => boolean = () => false,
+): RoomWatch => {
   let stopped = false;
   let current: RoomSnapshot | null = null;
 
-  const push = (snapshot: RoomSnapshot) => {
-    if (stopped || (current && snapshot.version <= current.version)) return;
+  const apply = (snapshot: RoomSnapshot, replaceSameVersion: boolean) => {
+    if (stopped || !current) {
+      if (!stopped) {
+        current = snapshot;
+        onSnapshot(snapshot);
+      }
+      return;
+    }
+    const newer = snapshot.version > current.version;
+    const same = snapshot.version === current.version;
+    if (!newer && !(same && replaceSameVersion)) return;
     current = snapshot;
     onSnapshot(snapshot);
   };
+
+  // Server replies and full reads hold this player's real hand, so they are authoritative.
+  const push = (snapshot: RoomSnapshot) => apply(snapshot, true);
 
   const refresh = () => {
     void readRoom(roomId).then((snapshot) => {
@@ -70,7 +87,10 @@ export const watchRoom = (roomId: string, onSnapshot: (snapshot: RoomSnapshot) =
     const known = current;
     const sameHand =
       known?.cards && data?.table && known.data.table?.handNumber === data.table.handNumber;
-    if (version !== null && data && known && sameHand) push({ version, data, cards: known.cards });
+    // Our own move echoes back here too, often before its reply. The reply has the
+    // updated hand, so wait for it rather than pairing new data with the old hand.
+    if (isBusy()) return;
+    if (version !== null && data && known && sameHand) apply({ version, data, cards: known.cards }, false);
     else refresh();
   };
 

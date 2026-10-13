@@ -110,7 +110,10 @@ export const GameScreen = ({ client, onExit }: Props) => {
   );
   const skipTargets = view.players.filter((p) => p.id !== myId && !p.skipPending);
 
+  const [drawing, setDrawing] = useState(false);
+
   const send = async (move: Move): Promise<boolean> => {
+    setSelectedIds([]);
     const error = await client.send(move);
     if (error) {
       setToast(sendErrorMessage(error));
@@ -118,8 +121,14 @@ export const GameScreen = ({ client, onExit }: Props) => {
       buzz([30, 40, 30]);
       return false;
     }
-    setSelectedIds([]);
     return true;
+  };
+
+  /** A draw needs the server (the card is secret), so block a second tap until it lands. */
+  const draw = (source: 'deck' | 'discard') => {
+    if (drawing) return;
+    setDrawing(true);
+    void send({ type: 'draw', source }).finally(() => setDrawing(false));
   };
 
   const toggle = (id: string) => {
@@ -147,9 +156,9 @@ export const GameScreen = ({ client, onExit }: Props) => {
   const confirmLayDown = () => {
     if (!builderSlots) return;
     const groups = builderSlots.map((s) => s.cards.map((c) => c.id));
-    void send({ type: 'lay-down', groups }).then((ok) => {
-      if (ok) setSlots(null);
-    });
+    // The builder already checked the level, so close it now; a refusal shows a message.
+    setSlots(null);
+    void send({ type: 'lay-down', groups });
   };
 
   const discard = () => {
@@ -234,9 +243,10 @@ export const GameScreen = ({ client, onExit }: Props) => {
 
       <Piles
         view={view}
-        canDraw={canDraw}
-        onDrawDeck={() => void send({ type: 'draw', source: 'deck' })}
-        onDrawDiscard={() => void send({ type: 'draw', source: 'discard' })}
+        canDraw={canDraw && !drawing}
+        pending={drawing}
+        onDrawDeck={() => draw('deck')}
+        onDrawDiscard={() => draw('discard')}
       />
 
       <main className="middle">
