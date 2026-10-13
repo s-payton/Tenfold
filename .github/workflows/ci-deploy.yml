@@ -92,6 +92,3 @@ jobs:
       - if: steps.secrets.outputs.ready == 'true'
         # Deploys every function in supabase/functions (folders starting with _ are shared code).
         run: supabase functions deploy --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
-      - if: steps.secrets.outputs.ready == 'true'
-        name: Remove the retired play function (one-time)
-        run: supabase functions delete play --project-ref "$PROJECT_REF" || true

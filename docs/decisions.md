@@ -108,7 +108,7 @@ Measured before: about 500 to 600 ms per move at the function, plus a follow-up 
 
 ## 2026-10-14: Speed pass
 
-- **Tried a direct Postgres connection from the function** (`postgres` driver through `SUPABASE_DB_URL`). Saving dropped from about 70 ms to about 8 ms, but loading rose to about 130 ms, because Supabase rarely reuses a function instance between requests, so nearly every request opened a new database connection. Net: no gain. Dropped; the function stays on the REST API. (The experiment's `play` function is still deployed on Supabase but unused; delete it with `supabase functions delete play` when convenient.)
+- **Tried a direct Postgres connection from the function** (`postgres` driver through `SUPABASE_DB_URL`). Saving dropped from about 70 ms to about 8 ms, but loading rose to about 130 ms, because Supabase rarely reuses a function instance between requests, so nearly every request opened a new database connection. Net: no gain. Dropped; the function stays on the REST API. (The experiment's `play` function was deleted from Supabase on 2026-10-14.)
 - **Signing keys bundled at deploy:** `sync-functions.mjs` saves the project's public JWKS into `_shared/jwks.json`, and the function verifies session tokens locally with `jose`. A cold start no longer downloads the keys (they cost 55 to 110 ms on most calls). If the keys rotate, it falls back to Supabase's own check.
 - **Draws feel instant:** a face-down card flies into the hand on tap (or the known discard, when taking it), replaced by the real card when the server answers.
 - **Smaller first download:** framer-motion runs through `LazyMotion` with `m` components, and its features load right after first paint. Main bundle 138 kB to 112 kB gzipped.
