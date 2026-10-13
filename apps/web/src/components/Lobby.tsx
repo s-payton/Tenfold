@@ -5,7 +5,7 @@ import { callGame } from '../net/api.ts';
 import { watchRoom, type RoomSnapshot } from '../net/room.ts';
 import { saveName } from '../net/savedRoom.ts';
 import type { RoomSettings } from '@tenfold/server';
-import { applyTable, saveSettings } from '../prefs.ts';
+import { applyTable, loadSettings, saveSettings } from '../prefs.ts';
 import { RulesEditor } from './RulesEditor.tsx';
 
 interface Props {
@@ -26,11 +26,19 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
   const handedOff = useRef(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [botLevel, setBotLevel] = useState<BotLevel>('medium');
+  /** The host's latest settings, shown until the server has them. */
+  const [draft, setDraft] = useState<RoomSettings | null>(null);
+  const queued = useRef<RoomSettings | null>(null);
+  const sending = useRef(false);
+
+  /** Never step back to an older version than the one on screen. */
+  const showSnapshot = (next: RoomSnapshot) =>
+    setSnapshot((current) => (current && current.version > next.version ? current : next));
 
   useEffect(() => {
     const watch = watchRoom(roomId, (next) => {
       if (!next.data.table) {
-        setSnapshot(next);
+        setSnapshot((current) => (current && current.version > next.version ? current : next));
       } else if (!handedOff.current) {
         handedOff.current = true;
         onStarted(next);
@@ -39,7 +47,37 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
     return watch.stop;
   }, [roomId, onStarted]);
 
-  const table = snapshot?.data.settings.table;
+  const act = async (action: Parameters<typeof callGame>[0]) => {
+    setError(null);
+    const result = await callGame(action);
+    if (result.ok) showSnapshot(result.snapshot);
+    else setError(apiErrorMessage(result.error));
+  };
+
+  /** Sends settings one request at a time, always the newest, so quick taps never undo each other. */
+  const flushSettings = async () => {
+    if (sending.current) return;
+    sending.current = true;
+    while (queued.current) {
+      const settings = queued.current;
+      queued.current = null;
+      await act({ type: 'settings', roomId, settings });
+    }
+    sending.current = false;
+    setDraft(null);
+  };
+
+  const table = (draft ?? snapshot?.data.settings)?.table;
+
+  // A brand-new room starts with the host's remembered house rules and table.
+  const fresh = snapshot?.version === 1 && snapshot.data.hostPlayerId === playerId;
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!fresh || seeded.current) return;
+    seeded.current = true;
+    queued.current = loadSettings();
+    void flushSettings();
+  });
   useEffect(() => {
     if (table) applyTable(table);
   }, [table]);
@@ -79,21 +117,14 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
     }
     saveName(trimmed);
     setEditing(null);
-    setSnapshot(result.snapshot);
-  };
-
-  const act = async (action: Parameters<typeof callGame>[0]) => {
-    setError(null);
-    const result = await callGame(action);
-    if (result.ok) setSnapshot(result.snapshot);
-    else setError(apiErrorMessage(result.error));
+    showSnapshot(result.snapshot);
   };
 
   const changeSettings = (settings: RoomSettings) => {
-    // Show the change at once; the server's reply confirms it.
-    setSnapshot({ ...snapshot, data: { ...snapshot.data, settings } });
+    setDraft(settings);
     saveSettings(settings);
-    void act({ type: 'settings', roomId, settings });
+    queued.current = settings;
+    void flushSettings();
   };
 
   const start = async () => {
@@ -180,7 +211,7 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
         <button
           type="button"
           className="btn btn--primary btn--big"
-          disabled={!canStart || starting}
+          disabled={!canStart || starting || draft !== null}
           onClick={() => void start()}
         >
           {starting ? COPY.working : COPY.startGame}
@@ -202,7 +233,7 @@ export const Lobby = ({ roomId, playerId, onStarted, onLeave }: Props) => {
         <summary>{COPY.houseRules}</summary>
         {!isHost && <p className="rules__help">{COPY.houseRulesHint}</p>}
         <RulesEditor
-          value={data.settings}
+          value={draft ?? data.settings}
           showTimer
           {...(isHost ? { onChange: changeSettings } : {})}
         />

@@ -52,10 +52,6 @@ export const App = () => {
       return;
     }
     const room = { roomId: result.roomId, code: result.code, playerId: result.playerId };
-    // A new room starts with the host's remembered house rules and table.
-    if (result.snapshot.data.hostPlayerId === result.playerId && result.snapshot.version === 1) {
-      void online().then((m) => m.callGame({ type: 'settings', roomId: room.roomId, settings: loadSettings() }));
-    }
     saveRoom(room);
     setScreen({ kind: 'lobby', room });
   };
