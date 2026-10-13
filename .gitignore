@@ -4,3 +4,6 @@ coverage/
 .env*
 .DS_Store
 *.log
+
+# Reference PDFs stay local (third-party, trademarked content)
+/*.pdf

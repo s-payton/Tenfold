@@ -50,13 +50,13 @@ Play:
 - Deal 10 cards each. Flip one to start the discard pile (if a Skip, handle per official rules).
 - Turn: draw from the deck or take the top discard (not a Skip), optionally lay down your level if you have it, optionally hit, then discard one card.
 - Wilds substitute for any number or color. Sets and runs must contain at least one natural card. Runs do not wrap (12 to 1).
-- Skips cannot be used in a level. Discarding a Skip makes a chosen player lose their next turn.
+- Skips cannot be used in a level. Discarding a Skip makes a chosen player lose their next turn. No stacking: a player with a skip already pending cannot be chosen again until they lose that turn. With 2 players, the discarder plays again right away.
+- If the draw pile runs out, shuffle the discard pile (except its top card) into a new draw pile.
 - You may only lay down your level once per hand, all at once. After laying down, you may hit on any laid-down group (yours or others') with legal cards.
 - A hand ends when a player goes out (no cards left). Others score the cards in their hand.
 - Scoring: 1 to 9 = 5 points, 10 to 12 = 10 points, Skip = 15, Wild = 25.
 - Players who did not complete their level repeat it next hand. Players who did advance.
-- Game ends when someone completes level 10. Lowest total score wins. Ties are broken per official rules.
-- When two or more players finish the final level in the same hand, lowest score wins.
+- Game ends when a player on level 10 goes out (lays level 10 and empties their hand). That player wins. Laying level 10 without going out does not win; that player repeats level 10 next hand. Points never decide the winner (house rule, see `docs/rules-notes.md`).
 
 Verify edge cases against the official rule sheet when writing tests, and list any ambiguity found in `docs/rules-notes.md`.
 
