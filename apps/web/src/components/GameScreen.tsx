@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   arrangeRun,
   findLevel,
@@ -11,15 +11,19 @@ import {
   type PublicView,
   type RulesConfig,
 } from '@tenfold/engine';
+import { THROWABLES, type ChatBody } from '@tenfold/server';
 import { playSound, setMuted } from '../audio.ts';
-import { COPY, describeLevel, sendErrorMessage } from '../copy.ts';
+import { COPY, apiErrorMessage, describeLevel, sendErrorMessage } from '../copy.ts';
 import { sortCards, type SortMode } from '../game/cardOrder.ts';
 import type { GameClient } from '../game/client.ts';
+import { useChatEffects } from '../game/useChatEffects.ts';
 import { useGameSounds } from '../game/useGameSounds.ts';
 import { useGameView } from '../game/useGameView.ts';
 import { useRoomData } from '../game/useRoomData.ts';
 import { buzz } from '../haptics.ts';
 import { applyTable } from '../prefs.ts';
+import { ChatLayer } from './ChatLayer.tsx';
+import { ChatPanel } from './ChatPanel.tsx';
 import { Hand } from './Hand.tsx';
 import { HandOver } from './HandOver.tsx';
 import { LayDownBuilder, type BuilderSlot } from './LayDownBuilder.tsx';
@@ -84,6 +88,17 @@ export const GameScreen = ({ client, onExit }: Props) => {
   const [handStart, setHandStart] = useState({ hand: view.handNumber, levels: levelsOf(view) });
   const [seenTurn, setSeenTurn] = useState(view.turn);
   const [skipFlash, setSkipFlash] = useState<{ readonly key: number; readonly message: string } | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [throwAt, setThrowAt] = useState<string | null>(null);
+  const [readUpTo, setReadUpTo] = useState(0);
+
+  const messages = useSyncExternalStore(client.subscribe, client.chat.getMessages);
+  const { effects, done: effectDone } = useChatEffects(messages);
+  const lastMessageId = messages.at(-1)?.id ?? 0;
+  if (chatOpen && lastMessageId > readUpTo) setReadUpTo(lastMessageId);
+  const unread = messages.filter(
+    (m) => m.live && m.id > readUpTo && m.playerId !== myId && m.body.kind !== 'throw',
+  ).length;
 
   if (handStart.hand !== view.handNumber) {
     setHandStart({ hand: view.handNumber, levels: levelsOf(view) });
@@ -280,6 +295,17 @@ export const GameScreen = ({ client, onExit }: Props) => {
     if (table) applyTable(table);
   }, [table]);
 
+  const paused = room?.paused ?? null;
+  // Pausing is for timed games, and only while a clock is running.
+  const canPause =
+    client.pause !== undefined && room !== null && room.settings.turnSeconds !== null && room.turnDeadline !== null && !paused;
+
+  const sendChat = async (body: ChatBody) => {
+    const error = await client.chat.send(body);
+    if (error && !chatOpen) setToast(apiErrorMessage(error));
+    return error;
+  };
+
   const exit = () => {
     if (client.leave && view.status === 'playing') setConfirmLeave(true);
     else onExit();
@@ -297,18 +323,36 @@ export const GameScreen = ({ client, onExit }: Props) => {
           {COPY.home}
         </button>
         <span className="topbar__title">{COPY.appName}</span>
-        <button
-          type="button"
-          className="btn btn--small btn--ghost"
-          onClick={toggleMute}
-          aria-pressed={muted}
-          aria-label="Sound"
-        >
-          {muted ? '🔇' : '🔊'}
-        </button>
+        <div className="topbar__tools">
+          {canPause && (
+            <button type="button" className="btn btn--small btn--ghost" onClick={client.pause} aria-label={COPY.pause}>
+              ⏸
+            </button>
+          )}
+          {client.chat.canTalk && (
+            <button
+              type="button"
+              className="btn btn--small btn--ghost topbar__chat"
+              onClick={() => setChatOpen(true)}
+              aria-label={unread > 0 ? COPY.chatUnread(unread) : COPY.chat}
+            >
+              💬
+              {unread > 0 && <span className="badge">{unread > 9 ? '9+' : unread}</span>}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn--small btn--ghost"
+            onClick={toggleMute}
+            aria-pressed={muted}
+            aria-label="Sound"
+          >
+            {muted ? '🔇' : '🔊'}
+          </button>
+        </div>
       </header>
 
-      <Opponents view={view} names={names} {...(room ? { seats: room.players } : {})} />
+      <Opponents view={view} names={names} onPick={setThrowAt} {...(room ? { seats: room.players } : {})} />
 
       {room && !currentSeat?.bot && (
         <TurnClock deadline={room.turnDeadline} totalMs={clockTotal} mine={isMyTurn} />
@@ -350,7 +394,7 @@ export const GameScreen = ({ client, onExit }: Props) => {
         )}
       </main>
 
-      <section className={`me ${isMyTurn ? 'me--active' : ''}`}>
+      <section className={`me ${isMyTurn ? 'me--active' : ''}`} data-seat={myId}>
         <div className="me__info">
           <strong>{COPY.levelOf(me?.level ?? 1)}</strong>
           <span>{level ? describeLevel(level.requirements) : ''}</span>
@@ -401,6 +445,50 @@ export const GameScreen = ({ client, onExit }: Props) => {
       )}
 
       {skipFlash && <SkipFlash key={skipFlash.key} message={skipFlash.message} />}
+
+      {throwAt && (
+        <Sheet
+          title={COPY.throwAt(names[throwAt] ?? throwAt)}
+          options={THROWABLES.map((item) => ({
+            label: COPY.throwItems[item],
+            onPick: () => {
+              setThrowAt(null);
+              void sendChat({ kind: 'throw', item, targetId: throwAt });
+            },
+          }))}
+          onClose={() => setThrowAt(null)}
+        />
+      )}
+
+      {paused && view.status === 'playing' && (
+        <div className="pauseover" role="alertdialog" aria-modal="true" aria-label={COPY.pausedBy(names[paused.by] ?? '')}>
+          <p className="pauseover__icon" aria-hidden="true">
+            ⏸
+          </p>
+          <h2 className="pauseover__title">{COPY.pausedBy(names[paused.by] ?? paused.by)}</h2>
+          <p className="pauseover__hint">{COPY.pausedHint}</p>
+          <button type="button" className="btn btn--primary btn--big" onClick={client.resume}>
+            {COPY.resume}
+          </button>
+          {client.chat.canTalk && (
+            <button type="button" className="btn btn--ghost" onClick={() => setChatOpen(true)}>
+              {unread > 0 ? COPY.chatUnread(unread) : COPY.chat}
+            </button>
+          )}
+        </div>
+      )}
+
+      <ChatLayer effects={effects} myId={myId} onDone={effectDone} />
+
+      {chatOpen && (
+        <ChatPanel
+          messages={messages}
+          names={names}
+          myId={myId}
+          onSend={sendChat}
+          onClose={() => setChatOpen(false)}
+        />
+      )}
 
       {pending && (
         <Sheet

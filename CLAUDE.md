@@ -71,8 +71,10 @@ All variable behavior lives in a `RulesConfig` object with defaults set to stand
 - Join via a short room code plus a player-chosen display name. No accounts.
 - Player token stored in localStorage so a refresh or phone lock rejoins the same seat.
 - Everyone sees each player's current level next to their name (the simple leaderboard).
-- Turn timer: 30 seconds. On timeout the server auto-plays (draw from deck, discard the highest-point card that is not a Wild; a Wild only if nothing else is left). After 2 missed turns in a row a bot takes the seat. The human can reclaim the seat when they return.
+- Turn timer: 30 seconds by default (the host can pick 15, 30, 60, 90 or none). Any player can pause a timed game and anyone can resume it; the screen shows who paused. On timeout the server auto-plays (draw from deck, discard the highest-point card that is not a Wild; a Wild only if nothing else is left). After 2 missed turns in a row a bot takes the seat. The human can reclaim the seat when they return.
 - Realtime via Supabase Realtime subscriptions on the room and public game state. Private hand state fetched under RLS.
+- Chat, quick emoji reactions and thrown eggs and pies go through the same Edge Function into `room_messages` (members read under RLS, rate limited in the database). They never touch the room version, so they cannot race with moves.
+- Each player's score shows quietly on their chip. Confetti falls when someone wins the game.
 
 ## Bots
 
@@ -102,4 +104,4 @@ Bots come after the engine, UI, and multiplayer are working.
 
 ## Out of scope for now
 
-Accounts, chat, custom card art, custom rules UI, native apps. The engine is portable so a native wrapper is possible later.
+Accounts, custom card art, native apps. The engine is portable so a native wrapper is possible later.

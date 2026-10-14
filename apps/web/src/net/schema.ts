@@ -1,5 +1,5 @@
 import type { Card } from '@tenfold/engine';
-import type { RoomData } from '@tenfold/server';
+import type { ChatBody, RoomData } from '@tenfold/server';
 
 /** The only tables a client can read (see supabase/migrations). Clients never write. */
 export interface Database {
@@ -13,6 +13,12 @@ export interface Database {
       };
       hands: {
         Row: { room_id: string; player_id: string; user_id: string; version: number; cards: Card[] };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      room_messages: {
+        Row: { id: number; room_id: string; player_id: string; body: ChatBody; created_at: string };
         Insert: never;
         Update: never;
         Relationships: [];

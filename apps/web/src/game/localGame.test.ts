@@ -15,6 +15,19 @@ const untilMyTurn = (game: ReturnType<typeof createLocalGame>) => {
 };
 
 describe('createLocalGame', () => {
+  it('keeps throws on this phone as live messages, with no text chat', async () => {
+    const game = createLocalGame({ opponents: 1, seed: 1 });
+    const heard = vi.fn();
+    game.subscribe(heard);
+    expect(game.chat.canTalk).toBe(false);
+    expect(await game.chat.send({ kind: 'throw', item: 'pie', targetId: 'ada' })).toBeNull();
+    expect(game.chat.getMessages()).toMatchObject([
+      { id: 1, playerId: HUMAN_ID, live: true, body: { kind: 'throw', item: 'pie', targetId: 'ada' } },
+    ]);
+    expect(heard).toHaveBeenCalled();
+    game.dispose();
+  });
+
   it('names the human and opponents', () => {
     const game = createLocalGame({ opponents: 3, seed: 1 });
     expect(Object.values(game.names)).toEqual(['You', 'Ada', 'Bo', 'Cy']);

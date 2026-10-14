@@ -12,7 +12,7 @@ import {
   type BotLevel,
   type RulesConfig,
 } from '@tenfold/engine';
-import type { GameClient } from './client.ts';
+import type { ChatEntry, GameClient } from './client.ts';
 
 export const HUMAN_ID = 'you';
 const OPPONENT_NAMES = ['Ada', 'Bo', 'Cy', 'Dee', 'Eli'];
@@ -38,6 +38,7 @@ export const createLocalGame = (options: LocalGameOptions): GameClient => {
   let view: PublicView = publicView(state, HUMAN_ID);
   let timer: ReturnType<typeof setTimeout> | undefined;
   const listeners = new Set<() => void>();
+  let messages: readonly ChatEntry[] = [];
 
   const commit = (next: GameState) => {
     state = next;
@@ -81,6 +82,17 @@ export const createLocalGame = (options: LocalGameOptions): GameClient => {
     dispose: () => {
       clearTimeout(timer);
       listeners.clear();
+    },
+    // The computer players don't talk, but they can still take an egg.
+    chat: {
+      canTalk: false,
+      getMessages: () => messages,
+      send: (body) => {
+        const id = (messages.at(-1)?.id ?? 0) + 1;
+        messages = [...messages, { id, playerId: HUMAN_ID, at: Date.now(), body, live: true }];
+        for (const listener of listeners) listener();
+        return Promise.resolve(null);
+      },
     },
   };
 };

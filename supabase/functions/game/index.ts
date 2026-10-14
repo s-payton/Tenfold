@@ -76,6 +76,15 @@ const store: Store = {
     if (error) throw error;
     return data === true;
   },
+  addMessage: async (message) => {
+    const { data, error } = await admin.rpc('post_message', {
+      p_room_id: message.roomId,
+      p_player_id: message.playerId,
+      p_body: message.body,
+    });
+    if (error) throw error;
+    return data === true;
+  },
 };
 
 const deps = {

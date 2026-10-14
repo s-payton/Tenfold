@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanCode, cleanName, parseAction, parseMove, parseSettings } from './parse.ts';
+import { MAX_CHAT_LENGTH, cleanCode, cleanName, cleanText, parseAction, parseChatBody, parseMove, parseSettings } from './parse.ts';
 import { DEFAULT_SETTINGS } from './rooms.ts';
 
 describe('cleanName', () => {
@@ -12,6 +12,42 @@ describe('cleanName', () => {
   it('rejects empty or non-string names', () => {
     expect(cleanName('   ')).toBeNull();
     expect(cleanName(42)).toBeNull();
+  });
+});
+
+describe('cleanText', () => {
+  it('turns control characters into spaces, trims, and caps the length', () => {
+    expect(cleanText('  hi\nthere  ')).toBe('hi there');
+    expect(cleanText('x'.repeat(500))).toHaveLength(MAX_CHAT_LENGTH);
+    expect(cleanText(' \n ')).toBeNull();
+    expect(cleanText(7)).toBeNull();
+  });
+
+  it('never cuts an emoji in half', () => {
+    const text = cleanText('😂'.repeat(MAX_CHAT_LENGTH + 5)) ?? '';
+    expect(Array.from(text)).toHaveLength(MAX_CHAT_LENGTH);
+    expect(text.endsWith('😂')).toBe(true);
+  });
+});
+
+describe('parseChatBody', () => {
+  it('accepts text, listed emojis and throws', () => {
+    expect(parseChatBody({ kind: 'text', text: ' gg ' })).toEqual({ kind: 'text', text: 'gg' });
+    expect(parseChatBody({ kind: 'emoji', emoji: '🎉' })).toEqual({ kind: 'emoji', emoji: '🎉' });
+    expect(parseChatBody({ kind: 'throw', item: 'pie', targetId: 'p2' })).toEqual({
+      kind: 'throw',
+      item: 'pie',
+      targetId: 'p2',
+    });
+  });
+
+  it('rejects anything else', () => {
+    expect(parseChatBody({ kind: 'text', text: '   ' })).toBeNull();
+    expect(parseChatBody({ kind: 'emoji', emoji: '💩' })).toBeNull();
+    expect(parseChatBody({ kind: 'throw', item: 'brick', targetId: 'p2' })).toBeNull();
+    expect(parseChatBody({ kind: 'throw', item: 'egg' })).toBeNull();
+    expect(parseChatBody({ kind: 'shout' })).toBeNull();
+    expect(parseChatBody('hi')).toBeNull();
   });
 });
 
@@ -86,7 +122,7 @@ describe('parseAction', () => {
   });
 
   it('parses the seat and timer actions', () => {
-    for (const type of ['timeout', 'reclaim', 'leave'] as const) {
+    for (const type of ['timeout', 'reclaim', 'leave', 'pause', 'resume'] as const) {
       expect(parseAction({ type, roomId: 'r1' })).toEqual({ type, roomId: 'r1' });
     }
     expect(parseAction({ type: 'add-bot', roomId: 'r1', level: 'hard' })).toEqual({
@@ -101,6 +137,16 @@ describe('parseAction', () => {
       playerId: 'p2',
     });
     expect(parseAction({ type: 'remove', roomId: 'r1' })).toBeNull();
+  });
+
+  it('parses chat', () => {
+    expect(parseAction({ type: 'chat', roomId: 'r1', body: { kind: 'text', text: 'hi' } })).toEqual({
+      type: 'chat',
+      roomId: 'r1',
+      body: { kind: 'text', text: 'hi' },
+    });
+    expect(parseAction({ type: 'chat', roomId: 'r1', body: { kind: 'text', text: '' } })).toBeNull();
+    expect(parseAction({ type: 'chat', body: { kind: 'text', text: 'hi' } })).toBeNull();
   });
 
   it('rejects bad actions', () => {
@@ -122,6 +168,7 @@ describe('parseSettings', () => {
   });
 
   it('rejects anything off the menu', () => {
+    expect(parseSettings({ ...DEFAULT_SETTINGS, turnSeconds: 15 })).toMatchObject({ turnSeconds: 15 });
     expect(parseSettings({ ...DEFAULT_SETTINGS, turnSeconds: 5 })).toBeNull();
     expect(parseSettings({ ...DEFAULT_SETTINGS, table: 'neon' })).toBeNull();
     expect(parseSettings({ ...DEFAULT_SETTINGS, rules: { ...DEFAULT_SETTINGS.rules, levelSet: 'odd' } })).toBeNull();

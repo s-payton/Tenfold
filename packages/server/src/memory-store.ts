@@ -1,11 +1,13 @@
-import type { Store, StoredRoom } from './types.ts';
+import type { NewMessage, Store, StoredRoom } from './types.ts';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 /** An in-memory Store with the same version check as the database, for tests. */
 export const createMemoryStore = () => {
   const rooms = new Map<string, StoredRoom>();
+  const messages: NewMessage[] = [];
   let failNextSaves = 0;
+  let refuseMessages = false;
   const store: Store = {
     loadRoom: (key) => {
       const room =
@@ -26,10 +28,20 @@ export const createMemoryStore = () => {
       rooms.set(room.id, clone({ ...room, version: expectedVersion + 1 }));
       return Promise.resolve(true);
     },
+    addMessage: (message) => {
+      if (refuseMessages) return Promise.resolve(false);
+      messages.push(clone(message));
+      return Promise.resolve(true);
+    },
   };
   return {
     store,
     rooms,
+    messages,
+    /** Makes every message report that the sender is going too fast, like the database limit. */
+    refuseMessages: (value: boolean) => {
+      refuseMessages = value;
+    },
     /** Makes the next `n` saves report a conflict, like another request winning the race. */
     failSaves: (n: number) => {
       failNextSaves = n;

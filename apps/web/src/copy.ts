@@ -121,6 +121,23 @@ export const COPY = {
   installIos: 'To install: tap the Share button, then Add to Home Screen.',
   crashed: 'Something went wrong on this screen.',
   reload: 'Reload',
+  chat: 'Chat',
+  chatUnread: (n: number) => `Chat, ${String(n)} new`,
+  chatPlaceholder: 'Say something',
+  chatEmpty: 'No messages yet. Say hi!',
+  chatEmojis: 'Quick reactions',
+  send: 'Send',
+  close: 'Close',
+  throwAt: (name: string) => `Throw something at ${name}?`,
+  throwLabel: (name: string) => `Throw something at ${name}`,
+  throwItems: { egg: '🥚 Throw an egg', pie: '🥧 Throw a pie' },
+  threw: (who: string, item: 'egg' | 'pie', target: string) =>
+    `${who} threw ${item === 'egg' ? 'an egg' : 'a pie'} at ${target}`,
+  youObject: 'you',
+  pause: 'Pause',
+  resume: 'Resume',
+  pausedBy: (name: string) => `${name} paused the game`,
+  pausedHint: 'The clock is stopped. Anyone can resume.',
 } as const;
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -222,6 +239,8 @@ const SERVER_ERRORS: Record<Exclude<ApiError['code'], 'move-rejected'>, string> 
   busy: 'The table is busy. Try again.',
   'not-in-lobby': 'That can only be changed before the game starts.',
   'too-early': 'There is still time on the clock.',
+  paused: 'The game is paused.',
+  'slow-down': 'Slow down a little.',
   offline: 'Could not reach the table. Check your connection.',
   'no-session': 'Could not connect. Check your connection and try again.',
   'rate-limited': 'Too many new players from this network just now. Try again in a few minutes.',

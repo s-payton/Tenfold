@@ -20,6 +20,7 @@ import { ROOM_CODE_LENGTH, ROOM_CODE_LETTERS } from './parse.ts';
 import type {
   Action,
   ActionResult,
+  ChatBody,
   Deps,
   RoomPlayer,
   RoomSettings,
@@ -46,6 +47,8 @@ export const BOT_TURN_MS = 1_200;
 export const MISSES_BEFORE_BOT = 2;
 export const STAND_IN_LEVEL: BotLevel = 'medium';
 const BOT_NAMES = ['Ada', 'Bo', 'Cy', 'Dee', 'Eli', 'Fay', 'Gus'];
+/** After a pause, whoever is up always gets at least this long. */
+export const MIN_RESUME_MS = 5_000;
 /** Safety cap on moves a computer makes in one turn. */
 const MAX_AUTO_MOVES = 40;
 
@@ -98,12 +101,16 @@ const updateSeat = (room: StoredRoom, playerId: string, change: Partial<RoomPlay
     room.data.players.map((p) => (p.id === playerId ? { ...p, ...change } : p)),
   );
 
-/** Stores a game state, refreshes the public table, and starts the clock for whoever is up. */
+/**
+ * Stores a game state, refreshes the public table, and starts the clock for whoever is up.
+ * While paused the clock stays stopped and holds a full turn for them instead.
+ */
 const withGame = (room: StoredRoom, game: GameState, now: number): StoredRoom => {
   const current = seatOf(room, game.players[game.currentIndex]?.id);
   const personMs = room.data.settings.turnSeconds === null ? null : room.data.settings.turnSeconds * 1000;
-  const turnMs = current?.bot ? BOT_TURN_MS : personMs;
-  const turnDeadline = game.status === 'playing' && turnMs !== null ? now + turnMs : null;
+  const turnMs = game.status === 'playing' ? (current?.bot ? BOT_TURN_MS : personMs) : null;
+  const pause = room.data.paused;
+  const paused = pause && turnMs !== null ? { ...pause, remainingMs: turnMs } : null;
   return {
     ...room,
     game,
@@ -111,7 +118,8 @@ const withGame = (room: StoredRoom, game: GameState, now: number): StoredRoom =>
       ...room.data,
       status: game.status === 'game-over' ? 'finished' : 'playing',
       table: tableView(game),
-      turnDeadline,
+      turnDeadline: paused || turnMs === null ? null : now + turnMs,
+      paused,
     },
   };
 };
@@ -312,12 +320,53 @@ const timeout = (deps: Deps, userId: string) => (room: StoredRoom): Change => {
   return { ok: true, playerId, room: withGame(next, played, deps.now()) };
 };
 
+const pause = (deps: Deps, userId: string) => (room: StoredRoom): Change => {
+  const playerId = memberOf(room, userId);
+  if (!playerId) return refuse('not-a-member');
+  const deadline = room.data.turnDeadline;
+  if (room.data.paused) return { ok: true, room, playerId };
+  // Only a running clock can be paused.
+  if (room.game?.status !== 'playing' || deadline === null) return refuse('bad-request');
+  const remainingMs = Math.max(MIN_RESUME_MS, deadline - deps.now());
+  return {
+    ok: true,
+    playerId,
+    room: { ...room, data: { ...room.data, turnDeadline: null, paused: { by: playerId, remainingMs } } },
+  };
+};
+
+const resume = (deps: Deps, userId: string) => (room: StoredRoom): Change => {
+  const playerId = memberOf(room, userId);
+  if (!playerId) return refuse('not-a-member');
+  const paused = room.data.paused;
+  if (!paused) return { ok: true, room, playerId };
+  return {
+    ok: true,
+    playerId,
+    room: { ...room, data: { ...room.data, turnDeadline: deps.now() + paused.remainingMs, paused: null } },
+  };
+};
+
+/** Chat goes next to the room, not in it, so it never races with moves for the room version. */
+const chat = async (store: Store, userId: string, roomId: string, body: ChatBody): Promise<ActionResult> => {
+  const room = await store.loadRoom({ id: roomId });
+  if (!room) return fail({ code: 'room-not-found' });
+  const playerId = memberOf(room, userId);
+  if (!playerId) return fail({ code: 'not-a-member' });
+  if (body.kind === 'throw' && (body.targetId === playerId || !seatOf(room, body.targetId))) {
+    return fail({ code: 'bad-request' });
+  }
+  if (!(await store.addMessage({ roomId: room.id, playerId, body }))) return fail({ code: 'slow-down' });
+  return { ok: true, roomId: room.id, code: room.code, playerId, snapshot: snapshotFor(room, playerId, room.version) };
+};
+
 const play =
   (deps: Deps, userId: string, run: (game: GameState, playerId: string, rules: RulesConfig) => MoveResult) =>
   (room: StoredRoom): Change => {
     const playerId = memberOf(room, userId);
     if (!playerId) return refuse('not-a-member');
     if (!room.game) return refuse('not-started');
+    if (room.data.paused) return refuse('paused');
     const result = run(room.game, playerId, roomRules(room));
     if (!result.ok) return { ok: false, error: { code: 'move-rejected', error: result.error } };
     // A person who moves is clearly here: clear their misses and any stand-in bot.
@@ -358,6 +407,12 @@ export const handle = async (
       return mutate(store, byId, addBot(deps, userId, action.level));
     case 'remove':
       return mutate(store, byId, remove(userId, action.playerId));
+    case 'pause':
+      return mutate(store, byId, pause(deps, userId));
+    case 'resume':
+      return mutate(store, byId, resume(deps, userId));
+    case 'chat':
+      return chat(store, userId, action.roomId, action.body);
     case 'settings':
       return mutate(store, byId, (room) => {
         const playerId = hostInLobby(room, userId);

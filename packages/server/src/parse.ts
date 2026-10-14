@@ -1,8 +1,9 @@
 import { BOT_LEVELS, LEVEL_SETS, type BotLevel, type HouseRules, type Move } from '@tenfold/engine';
-import { TABLE_THEMES, TURN_SECONDS, type RoomSettings } from './types.ts';
-import type { Action } from './types.ts';
+import { CHAT_EMOJIS, TABLE_THEMES, THROWABLES, TURN_SECONDS, type RoomSettings } from './types.ts';
+import type { Action, ChatBody } from './types.ts';
 
 export const MAX_NAME_LENGTH = 16;
+export const MAX_CHAT_LENGTH = 200;
 export const ROOM_CODE_LENGTH = 4;
 /** Consonants only, so codes never spell words and never mix up O/0 or I/1. */
 export const ROOM_CODE_LETTERS = 'BCDFGHJKLMNPQRSTVWXZ';
@@ -25,6 +26,15 @@ export const cleanName = (value: unknown): string | null => {
   // eslint-disable-next-line no-control-regex
   const name = value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, MAX_NAME_LENGTH);
   return name.length > 0 ? name : null;
+};
+
+/** Like cleanName but longer, and counted in characters so an emoji is never cut in half. */
+export const cleanText = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  // eslint-disable-next-line no-control-regex
+  const text = value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+  const clipped = Array.from(text).slice(0, MAX_CHAT_LENGTH).join('').trim();
+  return clipped.length > 0 ? clipped : null;
 };
 
 export const cleanCode = (value: unknown): string | null => {
@@ -78,6 +88,27 @@ export const parseMove = (input: unknown): Move | null => {
 const oneOf = <T>(options: readonly T[], value: unknown): T | undefined =>
   options.find((o) => o === value);
 
+/** Turns an untrusted chat message into a well-formed one, or null. */
+export const parseChatBody = (input: unknown): ChatBody | null => {
+  if (!isRecord(input)) return null;
+  switch (input.kind) {
+    case 'text': {
+      const text = cleanText(input.text);
+      return text ? { kind: 'text', text } : null;
+    }
+    case 'emoji': {
+      const emoji = oneOf(CHAT_EMOJIS, input.emoji);
+      return emoji ? { kind: 'emoji', emoji } : null;
+    }
+    case 'throw': {
+      const item = oneOf(THROWABLES, input.item);
+      return item && isId(input.targetId) ? { kind: 'throw', item, targetId: input.targetId } : null;
+    }
+    default:
+      return null;
+  }
+};
+
 const parseHouseRules = (input: unknown): HouseRules | null => {
   if (!isRecord(input)) return null;
   const { hitOnOthers, skipLosesTurn, wildDiscard, everyoneAdvances } = input;
@@ -124,6 +155,8 @@ export const parseAction = (input: unknown): Action | null => {
     case 'timeout':
     case 'reclaim':
     case 'leave':
+    case 'pause':
+    case 'resume':
       return isId(input.roomId) ? { type: input.type, roomId: input.roomId } : null;
     case 'add-bot': {
       const level = BOT_LEVELS.find((l): l is BotLevel => l === input.level);
@@ -137,6 +170,10 @@ export const parseAction = (input: unknown): Action | null => {
       return isId(input.roomId) && isId(input.playerId)
         ? { type: 'remove', roomId: input.roomId, playerId: input.playerId }
         : null;
+    case 'chat': {
+      const body = parseChatBody(input.body);
+      return isId(input.roomId) && body ? { type: 'chat', roomId: input.roomId, body } : null;
+    }
     case 'move': {
       const move = parseMove(input.move);
       return isId(input.roomId) && move ? { type: 'move', roomId: input.roomId, move } : null;

@@ -20,7 +20,7 @@ export const TABLE_THEMES = ['green', 'blue', 'red', 'wood', 'midnight'] as cons
 export type TableTheme = (typeof TABLE_THEMES)[number];
 
 /** Seconds a person gets per move, or null for no clock. */
-export const TURN_SECONDS = [30, 60, 90, null] as const;
+export const TURN_SECONDS = [15, 30, 60, 90, null] as const;
 export type TurnSeconds = (typeof TURN_SECONDS)[number];
 
 /** What the host chooses before the game starts. */
@@ -28,6 +28,12 @@ export interface RoomSettings {
   readonly rules: HouseRules;
   readonly table: TableTheme;
   readonly turnSeconds: TurnSeconds;
+}
+
+/** Who paused a timed game, and how much of the turn was left. */
+export interface Pause {
+  readonly by: string;
+  readonly remainingMs: number;
 }
 
 /** Everything members of a room may see. Published to the `room_states` table. */
@@ -40,6 +46,37 @@ export interface RoomData {
   readonly table: TableView | null;
   /** When the current turn times out, in epoch milliseconds. Null when nobody is on the clock. */
   readonly turnDeadline: number | null;
+  /** Set while someone has paused the game. Missing in rooms saved before pausing existed. */
+  readonly paused?: Pause | null;
+}
+
+/** Quick reactions anyone can send from the chat panel. */
+export const CHAT_EMOJIS = ['👍', '😂', '😮', '😬', '😡', '🎉', '❤️', '👏'] as const;
+export type ChatEmoji = (typeof CHAT_EMOJIS)[number];
+
+/** Things a player can throw at another player, just for fun. */
+export const THROWABLES = ['egg', 'pie'] as const;
+export type Throwable = (typeof THROWABLES)[number];
+
+export type ChatBody =
+  | { readonly kind: 'text'; readonly text: string }
+  | { readonly kind: 'emoji'; readonly emoji: ChatEmoji }
+  | { readonly kind: 'throw'; readonly item: Throwable; readonly targetId: string };
+
+/** A chat message as clients read it from the `room_messages` table. */
+export interface ChatMessage {
+  readonly id: number;
+  readonly playerId: string;
+  /** Epoch milliseconds. */
+  readonly at: number;
+  readonly body: ChatBody;
+}
+
+/** A message the referee has checked and is about to store. */
+export interface NewMessage {
+  readonly roomId: string;
+  readonly playerId: string;
+  readonly body: ChatBody;
 }
 
 /** Links a seat to the anonymous auth user who owns it. */
@@ -65,6 +102,8 @@ export interface Store {
   readonly createRoom: (room: StoredRoom) => Promise<boolean>;
   /** Saves atomically if the stored version still equals `expectedVersion`. Returns false on a conflict. */
   readonly saveRoom: (room: StoredRoom, expectedVersion: number) => Promise<boolean>;
+  /** Stores a chat message. Returns false if this player is sending too fast. */
+  readonly addMessage: (message: NewMessage) => Promise<boolean>;
 }
 
 export interface Deps {
@@ -87,7 +126,11 @@ export type Action =
   | { readonly type: 'leave'; readonly roomId: string }
   | { readonly type: 'add-bot'; readonly roomId: string; readonly level: BotLevel }
   | { readonly type: 'remove'; readonly roomId: string; readonly playerId: string }
-  | { readonly type: 'settings'; readonly roomId: string; readonly settings: RoomSettings };
+  | { readonly type: 'settings'; readonly roomId: string; readonly settings: RoomSettings }
+  /** Anyone may pause a game that has a clock running, and anyone may resume it. */
+  | { readonly type: 'pause'; readonly roomId: string }
+  | { readonly type: 'resume'; readonly roomId: string }
+  | { readonly type: 'chat'; readonly roomId: string; readonly body: ChatBody };
 
 export type ServerError =
   | {
@@ -102,6 +145,8 @@ export type ServerError =
         | 'not-started'
         | 'not-in-lobby'
         | 'too-early'
+        | 'paused'
+        | 'slow-down'
         | 'busy';
     }
   | { readonly code: 'move-rejected'; readonly error: MoveError };

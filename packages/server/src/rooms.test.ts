@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RULES, basicMove, createRng, getLevel, publicView } from '@tenfold/engine';
 import { createMemoryStore } from './memory-store.ts';
-import { BOT_TURN_MS, DEFAULT_SETTINGS, handle, handsOf, roomRules } from './rooms.ts';
+import { BOT_TURN_MS, DEFAULT_SETTINGS, MIN_RESUME_MS, handle, handsOf, roomRules } from './rooms.ts';
 
 const TURN_MS = 30_000;
 import type { ActionResult, Deps, StoredRoom } from './types.ts';
@@ -331,6 +331,116 @@ describe('turn timer', () => {
     const after = roomOf(t.rooms, host.roomId);
     expect(after.game?.turn).toBeGreaterThan(before.game?.turn ?? 0);
     expect(after.data.players.find((p) => p.bot)?.missed).toBe(0);
+  });
+});
+
+describe('pause', () => {
+  const started = async () => {
+    const t = await lobby(3);
+    okResult(await t.act('u0', { type: 'start', roomId: t.roomId }));
+    return t;
+  };
+
+  it('stops the clock, records who paused, and blocks moves and timeouts', async () => {
+    const t = await started();
+    t.advance(10_000);
+    const pauser = okResult(await t.act('u2', { type: 'pause', roomId: t.roomId }));
+    const room = roomOf(t.rooms, t.roomId);
+    expect(room.data.turnDeadline).toBeNull();
+    expect(room.data.paused).toEqual({ by: pauser.playerId, remainingMs: TURN_MS - 10_000 });
+
+    const { userId } = currentUser(t.rooms, t.roomId);
+    expect(await t.act(userId, { type: 'move', roomId: t.roomId, move: { type: 'draw', source: 'deck' } })).toEqual({
+      ok: false,
+      error: { code: 'paused' },
+    });
+    t.advance(TURN_MS * 5);
+    okResult(await t.act('u1', { type: 'timeout', roomId: t.roomId }));
+    expect(roomOf(t.rooms, t.roomId).game?.turn).toBe(room.game?.turn);
+  });
+
+  it('anyone can resume, and the turn picks up where it left off', async () => {
+    const t = await started();
+    t.advance(10_000);
+    okResult(await t.act('u2', { type: 'pause', roomId: t.roomId }));
+    t.advance(60_000);
+    okResult(await t.act('u1', { type: 'resume', roomId: t.roomId }));
+    const room = roomOf(t.rooms, t.roomId);
+    expect(room.data.paused).toBeNull();
+    expect(room.data.turnDeadline).toBe(t.now() + TURN_MS - 10_000);
+    const { userId } = currentUser(t.rooms, t.roomId);
+    okResult(await t.act(userId, { type: 'move', roomId: t.roomId, move: { type: 'draw', source: 'deck' } }));
+  });
+
+  it('leaves at least a few seconds on the clock after a resume', async () => {
+    const t = await started();
+    t.advance(TURN_MS - 500);
+    okResult(await t.act('u1', { type: 'pause', roomId: t.roomId }));
+    expect(roomOf(t.rooms, t.roomId).data.paused?.remainingMs).toBe(MIN_RESUME_MS);
+  });
+
+  it('pausing twice keeps the first pause, and only a running clock can be paused', async () => {
+    const t = await started();
+    const first = okResult(await t.act('u1', { type: 'pause', roomId: t.roomId }));
+    okResult(await t.act('u2', { type: 'pause', roomId: t.roomId }));
+    expect(roomOf(t.rooms, t.roomId).data.paused?.by).toBe(first.playerId);
+
+    const untimed = await lobby(2);
+    okResult(await untimed.act('u0', { type: 'settings', roomId: untimed.roomId, settings: { ...DEFAULT_SETTINGS, turnSeconds: null } }));
+    okResult(await untimed.act('u0', { type: 'start', roomId: untimed.roomId }));
+    expect(await untimed.act('u1', { type: 'pause', roomId: untimed.roomId })).toEqual({
+      ok: false,
+      error: { code: 'bad-request' },
+    });
+    expect(await t.act('stranger', { type: 'pause', roomId: t.roomId })).toEqual({
+      ok: false,
+      error: { code: 'not-a-member' },
+    });
+  });
+
+  it('the 15 second clock is on the menu', async () => {
+    const t = await lobby(2);
+    okResult(await t.act('u0', { type: 'settings', roomId: t.roomId, settings: { ...DEFAULT_SETTINGS, turnSeconds: 15 } }));
+    okResult(await t.act('u0', { type: 'start', roomId: t.roomId }));
+    expect(roomOf(t.rooms, t.roomId).data.turnDeadline).toBe(t.now() + 15_000);
+  });
+});
+
+describe('chat', () => {
+  it('stores messages from members without touching the room', async () => {
+    const t = await lobby(2);
+    const before = roomOf(t.rooms, t.roomId).version;
+    const sent = okResult(await t.act('u1', { type: 'chat', roomId: t.roomId, body: { kind: 'text', text: 'hi' } }));
+    expect(t.messages).toEqual([{ roomId: t.roomId, playerId: sent.playerId, body: { kind: 'text', text: 'hi' } }]);
+    expect(roomOf(t.rooms, t.roomId).version).toBe(before);
+  });
+
+  it('throws must hit someone else in the room', async () => {
+    const t = await lobby(2);
+    const host = roomOf(t.rooms, t.roomId).data.hostPlayerId;
+    const guest = roomOf(t.rooms, t.roomId).data.players[1]?.id ?? '';
+    okResult(await t.act('u0', { type: 'chat', roomId: t.roomId, body: { kind: 'throw', item: 'egg', targetId: guest } }));
+    for (const targetId of [host, 'nobody']) {
+      expect(await t.act('u0', { type: 'chat', roomId: t.roomId, body: { kind: 'throw', item: 'pie', targetId } })).toEqual({
+        ok: false,
+        error: { code: 'bad-request' },
+      });
+    }
+  });
+
+  it('refuses outsiders and players sending too fast', async () => {
+    const t = await lobby(2);
+    const body = { kind: 'emoji', emoji: '👍' } as const;
+    expect(await t.act('stranger', { type: 'chat', roomId: t.roomId, body })).toEqual({
+      ok: false,
+      error: { code: 'not-a-member' },
+    });
+    t.refuseMessages(true);
+    expect(await t.act('u0', { type: 'chat', roomId: t.roomId, body })).toEqual({
+      ok: false,
+      error: { code: 'slow-down' },
+    });
+    expect(t.messages).toEqual([]);
   });
 });
 

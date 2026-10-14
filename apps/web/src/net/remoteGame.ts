@@ -1,6 +1,7 @@
 import { predictView, rulesFromHouse, type Move, type PublicView } from '@tenfold/engine';
-import type { GameClient, SendError } from '../game/client.ts';
+import type { ChatEntry, GameClient, SendError } from '../game/client.ts';
 import { callGame } from './api.ts';
+import { watchChat } from './chat.ts';
 import { watchRoom, type RoomSnapshot } from './room.ts';
 
 const toView = (snapshot: RoomSnapshot, playerId: string): PublicView | null =>
@@ -68,6 +69,20 @@ export const createRemoteGame = (
   );
   watch.push(initial);
 
+  let messages: readonly ChatEntry[] = [];
+  const stopChat = watchChat(roomId, (next) => {
+    messages = next;
+    notify();
+  });
+
+  /** Pause, resume and the like: send, then show what the server saved. */
+  const control = (type: 'pause' | 'resume') => () => {
+    void callGame({ type, roomId }).then((result) => {
+      if (result.ok) watch.push(result.snapshot);
+      else watch.refresh();
+    });
+  };
+
   // Moves go to the server one at a time, in the order they were made.
   let queue: Promise<unknown> = Promise.resolve();
 
@@ -115,8 +130,19 @@ export const createRemoteGame = (
     dispose: () => {
       clearTimeout(clockTimer);
       watch.stop();
+      stopChat();
       listeners.clear();
     },
+    chat: {
+      canTalk: true,
+      getMessages: () => messages,
+      send: async (body) => {
+        const result = await callGame({ type: 'chat', roomId, body });
+        return result.ok ? null : result.error;
+      },
+    },
+    pause: control('pause'),
+    resume: control('resume'),
     getRoomData: () => roomData,
     reclaim: () => {
       void callGame({ type: 'reclaim', roomId }).then((result) => {

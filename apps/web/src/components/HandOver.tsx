@@ -1,6 +1,7 @@
 import { m } from 'framer-motion';
 import type { PublicView } from '@tenfold/engine';
 import { COPY } from '../copy.ts';
+import { Confetti } from './Confetti.tsx';
 
 interface Props {
   readonly view: PublicView;
@@ -16,6 +17,7 @@ export const HandOver = ({ view, startLevels, names, onNext, onHome }: Props) =>
   const gameOver = view.status === 'game-over';
   return (
     <div className="overlay" role="dialog" aria-modal="true">
+      {gameOver && <Confetti />}
       <m.div
         className="sheet"
         initial={{ scale: 0.9, opacity: 0 }}

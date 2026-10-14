@@ -124,3 +124,13 @@ Measured before: about 500 to 600 ms per move at the function, plus a follow-up 
 
 - **Table grants tightened.** Supabase gives `anon` and `authenticated` full table privileges by default and relies on row-level security. A migration now revokes everything except `select` on `room_states` and `hands` for `authenticated`, so a missing policy can never become a hole (and `truncate`, which RLS does not cover, is gone).
 - **Malformed room ids are "not found"**, not a database error, in the Edge Function adapter.
+
+## 2026-10-16: Chat, throws, pause and a faster clock
+
+- **Chat goes through the referee.** Text, quick emoji reactions and thrown eggs and pies are a `chat` action on the `game` Edge Function, which checks the sender is in the room and calls `post_message`. Messages live in their own `room_messages` table (members read under RLS, Realtime pushes inserts), not in the room, so chatting never bumps the room version or races with a move. The sender's seat comes from their verified session, so nobody can speak as someone else. Considered Realtime Broadcast instead: faster, but a member could put any name on a message.
+- **Limits:** 200 characters, a fixed list of emojis and throwables, 8 messages per player per 10 seconds (checked in `post_message`), and the newest 200 messages per room kept. Old rooms take their messages with them through `on delete cascade`.
+- **Only live messages animate.** Messages that arrive over Realtime play their bubble or throw once; history read after a rejoin or a phone wake shows in the chat panel only, so old pies never fly again.
+- **Against the computer** there is no chat panel, but throws still work on the phone itself.
+- **Pause:** any member can pause while a clock is running, and any member can resume (so a game never sticks if the pauser leaves). `RoomData.paused` records who paused and the time left; moves are refused while paused, and a resume always leaves at least 5 seconds. Rooms saved before this have no `paused` field, which reads as not paused.
+- **15 second clock** added for speed games. The clock turns red in the last third when that is under 10 seconds.
+- **Scores** show on every player's chip, small and muted, so they are visible without competing with the level.

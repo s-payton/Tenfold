@@ -10,7 +10,10 @@ type SoundName =
   | 'laydown'
   | 'win'
   | 'error'
-  | 'skip';
+  | 'skip'
+  | 'chat'
+  | 'whoosh'
+  | 'splat';
 
 const RATE = 22050;
 
@@ -29,6 +32,10 @@ const tone = (freq: number, start: number, length: number, volume = 0.3) => (t: 
 
 const noise = (length: number, volume: number) => (t: number) =>
   t > length ? 0 : volume * (Math.random() * 2 - 1) * Math.exp((-6 * t) / length);
+
+/** Noise that swells and fades, like something flying past. */
+const swell = (length: number, volume: number) => (t: number) =>
+  t > length ? 0 : volume * (Math.random() * 2 - 1) * Math.sin((Math.PI * t) / length) ** 2;
 
 const mix =
   (...parts: ((t: number) => number)[]) =>
@@ -75,6 +82,9 @@ const RECIPES: Record<SoundName, () => Float32Array> = {
     ),
   error: () => render(0.18, tone(170, 0, 0.18, 0.3)),
   skip: () => render(0.5, mix(tone(520, 0, 0.16), tone(390, 0.14, 0.16), tone(260, 0.28, 0.22))),
+  chat: () => render(0.18, mix(tone(1046, 0, 0.08, 0.12), tone(1318, 0.06, 0.12, 0.1))),
+  whoosh: () => render(0.45, swell(0.45, 0.12)),
+  splat: () => render(0.35, mix(noise(0.3, 0.5), tone(95, 0, 0.25, 0.5), tone(60, 0.03, 0.3, 0.35))),
 };
 
 let sounds: Partial<Record<SoundName, Howl>> | null = null;
