@@ -43,7 +43,7 @@ npm run functions:check  # copy shared code into the Edge Function and run deno 
 | `supabase/` | Database migrations and the `game` Edge Function |
 | `docs/` | Rule edge cases (`rules-notes.md`) and the design log (`decisions.md`) |
 
-Every push to `main` runs the checks, then deploys the web app to GitHub Pages and the database and function to Supabase, so the two always match.
+Every push to `main` runs the checks, then deploys the web app to GitHub Pages. The backend is a self-hosted Supabase. After a push to `main` that touches migrations, the `game` function, `packages/engine` or `packages/server`, the owner runs `bash /home/sam/dockers/supabase/deploy-tenfold.sh` on the server so the backend runs the same engine as the web app.
 
 ## A note on the name
 

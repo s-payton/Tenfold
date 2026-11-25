@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './schema.ts';
 
 // Both values are public by design. Row-level security is what protects the data.
-const SUPABASE_URL = 'https://miyplubvsjgqhbkpixqy.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_BcP3XR7v6KeaZZwF4iRfqQ_AUDQsMFx';
+const SUPABASE_URL = 'https://sam-server.tail17ca0b.ts.net:10000';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_dVEFSrdADSdHsi9We4soVb_QbXR4F2X';
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 

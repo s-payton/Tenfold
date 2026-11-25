@@ -12,13 +12,17 @@ if (!url || !serviceKey) throw new Error('Missing SUPABASE_URL or SUPABASE_SERVI
 
 const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 
+// Self-hosted, SUPABASE_URL is an internal address, but tokens are issued under the public
+// URL. Only the issuer check uses it.
+const issuer = `${Deno.env.get('SUPABASE_PUBLIC_URL') ?? url}/auth/v1`;
+
 // Session tokens are checked against the signing keys bundled at deploy time, so a cold
 // start does not have to download them. If the keys have rotated since the deploy,
 // Supabase's own check (which fetches the current keys) takes over.
 const localKeys = createLocalJWKSet(bundledKeys as JSONWebKeySet);
 const verifySession = async (token: string): Promise<string | undefined> => {
   try {
-    const { payload } = await jwtVerify(token, localKeys, { issuer: `${url}/auth/v1` });
+    const { payload } = await jwtVerify(token, localKeys, { issuer });
     return payload.role === 'authenticated' && typeof payload.sub === 'string' ? payload.sub : undefined;
   } catch {
     const { data } = await admin.auth.getClaims(token);

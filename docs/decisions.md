@@ -61,7 +61,7 @@ Short log of architecture choices. Newest at the bottom.
 - **Writes are atomic and versioned.** `commit_room` updates the room only if its version still matches, then rewrites hands, then the public row, in one transaction. The handler retries from a fresh copy on a conflict, so two quick taps cannot both apply.
 - **Clients read, Realtime nudges.** Clients subscribe to `room_states` changes and then re-read the public row and their own hand, retrying until both carry the same version, so the table and hand never disagree.
 - **Untrusted input:** request bodies are parsed into well-formed actions (`parseAction`) before the engine judges legality. Names are trimmed and capped at 16 characters. Room codes are 4 consonants.
-- **Deploy:** on push to main, CI syncs the shared code, runs `supabase db push`, and deploys the function. It skips itself until `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` are set as GitHub Actions secrets.
+- **Deploy:** on push to main, CI syncs the shared code, runs `supabase db push`, and deploys the function. It skips itself until `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` are set as GitHub Actions secrets. (Replaced on 2026-11-25 by a manual deploy on the self-hosted server, see below.)
 
 ## 2026-10-13: Faster online moves
 
@@ -134,3 +134,10 @@ Measured before: about 500 to 600 ms per move at the function, plus a follow-up 
 - **Pause:** any member can pause while a clock is running, and any member can resume (so a game never sticks if the pauser leaves). `RoomData.paused` records who paused and the time left; moves are refused while paused, and a resume always leaves at least 5 seconds. Rooms saved before this have no `paused` field, which reads as not paused.
 - **15 second clock** added for speed games. The clock turns red in the last third when that is under 10 seconds.
 - **Scores** show on every player's chip, small and muted, so they are visible without competing with the level.
+
+## 2026-11-25: Self-hosted backend
+
+- **Moved from hosted Supabase to a self-hosted Supabase** at `https://sam-server.tail17ca0b.ts.net:10000`. The web app uses its URL and publishable key (both public by design).
+- **Deploy is manual now.** The CI `supabase` job is gone; CI runs checks, builds and publishes to Pages. After a push to main that touches migrations, the `game` function, `packages/engine` or `packages/server`, the owner runs `bash /home/sam/dockers/supabase/deploy-tenfold.sh` on the server.
+- **Issuer:** self-hosted, the function's `SUPABASE_URL` is an internal address, but tokens carry the public URL as issuer. The local token check uses `SUPABASE_PUBLIC_URL` when set.
+- **Gatekeeper:** the server only exposes anonymous auth, JWKS, read-only REST on `room_states`, `hands` and `room_messages`, the `game` function and realtime. Email and password sign-in are off, and new sign-ups are limited to about 20 per minute in total.

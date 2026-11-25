@@ -1,4 +1,5 @@
-# Tenfold backend. Project: miyplubvsjgqhbkpixqy
+# Tenfold backend, self-hosted Supabase at https://sam-server.tail17ca0b.ts.net:10000.
+# Deployed on the server with: bash /home/sam/dockers/supabase/deploy-tenfold.sh
 project_id = "tenfold"
 
 [functions.game]
